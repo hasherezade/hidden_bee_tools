@@ -1,5 +1,5 @@
-# bee_parser
-Parsers and converters for Hidden Bee custom executable formats.
+# Hidden Bee tools
+Helper tools for analysis of Hidden Bee miner. Parsers and converters for Hidden Bee's custom executable formats.
 
 Clone:
 -
