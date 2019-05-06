@@ -3,7 +3,7 @@
 #include <string>
 #include <fstream>
 
-#include "peconv.h"
+#include <peconv.h>
 
 std::ofstream patch_report;
 
