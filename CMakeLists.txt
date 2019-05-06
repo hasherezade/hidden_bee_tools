@@ -14,5 +14,5 @@ set ( PECONV_LIB $<TARGET_FILE:libpeconv> CACHE FILE "PEConvLib library path" )
 
 # Add sub-directories
 #
-add_subdirectory ( bee_parser )
-
+add_subdirectory ( bee_lvl1_parser )
+add_subdirectory ( bee_lvl2_converter )
