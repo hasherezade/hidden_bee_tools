@@ -1,4 +1,5 @@
 #include "bee.h"
+#include <peconv.h>
 
 BEE_TYPE check_type(BYTE *buf, size_t buf_size)
 {
@@ -28,6 +29,11 @@ bool unscramble_pe(BYTE *buf, size_t buf_size) {
 
 	IMAGE_DOS_HEADER* dos_hdr = (IMAGE_DOS_HEADER*)buf;
 	dos_hdr->e_lfanew = hdr->pe_offset;
+
+	IMAGE_FILE_HEADER* file_hdrs = const_cast<IMAGE_FILE_HEADER*>(peconv::get_file_hdr(buf, buf_size));
+	if (!file_hdrs) return false;
+
+	file_hdrs->Machine = hdr->machine_id;
 	return true;
 }
 
