@@ -77,6 +77,28 @@ bool fill_sections(t_NS_section *ns_section, IMAGE_SECTION_HEADER *sec_hdr, size
 	return true;
 }
 
+size_t count_imports(t_NS_import *ns_import)
+{
+	for (size_t i = 0; true; i++) {
+		if (ns_import[i].first_thunk == 0 && ns_import[i].original_first_thunk == 0) {
+			return i;
+		}
+	}
+	return 0;
+}
+
+
+bool fill_imports(t_NS_import *ns_import, IMAGE_IMPORT_DESCRIPTOR *imp_desc, size_t dlls_count)
+{
+	for (size_t i = 0; i < dlls_count; i++) {
+		if (ns_import[i].first_thunk == 0 && ns_import[i].original_first_thunk == 0) break;
+		imp_desc[i].FirstThunk = ns_import[i].first_thunk;
+		imp_desc[i].OriginalFirstThunk = ns_import[i].original_first_thunk;
+		imp_desc[i].Name = ns_import[i].dll_name_rva;
+	}
+	return true;
+}
+
 bool ns_unscramble(BYTE *buf, size_t buf_size)
 {
 	t_NS_format *bee_hdr = (t_NS_format*)buf;
@@ -122,8 +144,24 @@ bool ns_unscramble(BYTE *buf, size_t buf_size)
 		<< "\nEP:    " << bee_hdr->entry_point
 		<< std::endl;
 
+	//WARNING: if file alignment differs from virtual alignmnent it needs to be converted!
+	DWORD imports_raw = bee_hdr->data_dir[1].dir_va;
+
+	t_NS_import *ns_import = (t_NS_import*)((ULONG_PTR)buf + imports_raw);
+	size_t dlls_count = count_imports(ns_import);
+
+	std::cout << "DLLs count: " << dlls_count << std::endl;
+	const size_t imp_area_size = dlls_count * sizeof(IMAGE_IMPORT_DESCRIPTOR);
+	
+	BYTE *rec_imports = new BYTE[imp_area_size];
+	memset(rec_imports, 0, imp_area_size);
+	fill_imports(ns_import, (IMAGE_IMPORT_DESCRIPTOR*)rec_imports, dlls_count);
+
 	memcpy(buf, rec_hdr, bee_hdr->hdr_size);
 	delete[]rec_hdr; rec_hdr = nullptr;
+
+	memcpy(buf + imports_raw, rec_imports, imp_area_size);
+	delete[]rec_imports; rec_imports = nullptr;
 	return true;
 }
 

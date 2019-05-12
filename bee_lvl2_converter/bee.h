@@ -43,7 +43,7 @@ typedef struct {
 	DWORD original_first_thunk;
 	DWORD first_thunk;
 	DWORD unknown;
-} t_NS_imports;
+} t_NS_import;
 
 typedef struct {
 	WORD magic; // 0x534e
