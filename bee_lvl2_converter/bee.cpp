@@ -41,14 +41,41 @@ bool unscramble_pe(BYTE *buf, size_t buf_size)
 	return true;
 }
 
+DWORD gcd(DWORD a, DWORD b)
+{
+	while (b != 0) {
+		DWORD t = b;
+		b = a % b;
+		a = t;
+	}
+	return a;
+}
+
+DWORD calc_sec_alignment(t_NS_section *ns_section, size_t sections_count)
+{
+	DWORD prev = 0;
+	for (size_t i = 0; i < sections_count; i++) {
+		if (prev != 0) {
+			prev = gcd(prev, ns_section[i].va);
+		}
+		else {
+			prev = ns_section[i].va;
+		}
+	}
+	std::cout << "GCD: " << std::hex << prev << "\n";
+	return prev;
+}
+
 template <typename T_IMAGE_OPTIONAL_HEADER>
 bool fill_nt_hdrs(t_NS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 {
+	DWORD alignment = calc_sec_alignment(&bee_hdr->sections, bee_hdr->sections_count);
+	nt_hdr->SectionAlignment = alignment;
+	nt_hdr->FileAlignment = alignment;
+
 	nt_hdr->ImageBase = bee_hdr->image_base;
 	nt_hdr->AddressOfEntryPoint = bee_hdr->entry_point;
 
-	nt_hdr->SectionAlignment = bee_hdr->hdr_size;
-	nt_hdr->FileAlignment = bee_hdr->hdr_size;
 	nt_hdr->SizeOfHeaders = bee_hdr->hdr_size;
 	nt_hdr->SizeOfImage = bee_hdr->module_size;
 
@@ -67,7 +94,12 @@ bool fill_nt_hdrs(t_NS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 
 bool fill_sections(t_NS_section *ns_section, IMAGE_SECTION_HEADER *sec_hdr, size_t sections_count)
 {
+	
 	for (size_t i = 0; i < sections_count; i++) {
+
+		std::cout << "VA: " << std::hex << ns_section[i].va << "\t" <<
+			"Size: " << ns_section[i].size << "\n";
+
 		sec_hdr[i].VirtualAddress = ns_section[i].va;
 		sec_hdr[i].PointerToRawData = ns_section[i].raw_addr;
 		sec_hdr[i].SizeOfRawData = ns_section[i].size;
@@ -86,7 +118,6 @@ size_t count_imports(t_NS_import *ns_import)
 	}
 	return 0;
 }
-
 
 bool fill_imports(t_NS_import *ns_import, IMAGE_IMPORT_DESCRIPTOR *imp_desc, size_t dlls_count)
 {
