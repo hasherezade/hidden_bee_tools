@@ -123,6 +123,7 @@ bool ns_unscramble(BYTE *buf, size_t buf_size)
 		<< std::endl;
 
 	memcpy(buf, rec_hdr, bee_hdr->hdr_size);
+	delete[]rec_hdr; rec_hdr = nullptr;
 	return true;
 }
 
