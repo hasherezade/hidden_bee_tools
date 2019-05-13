@@ -10,11 +10,13 @@ include_directories ( ${PECONV_DIR}/include )
 
 set (srcs
 	bee.cpp
+	ns_exe.cpp
 )
 
 # general headers - they will be used for both EXE and DLL:
 set (hdrs
 	bee.h
+	ns_exe.h
 )
 
 # Choose to build the DLL or EXE
