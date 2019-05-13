@@ -6,6 +6,14 @@ const WORD NS_MAGIC = 0x534e;
 
 namespace ns_exe {
 
+	const size_t NS_DATA_DIR_COUNT = 6;
+
+	enum data_dir_id {
+		NS_IMPORTS = 1,
+		NS_RELOCATIONS = 3,
+		NS_IAT = 4
+	};
+
 	typedef struct {
 		DWORD dir_va;
 		DWORD dir_size;
@@ -33,8 +41,10 @@ namespace ns_exe {
 		DWORD entry_point;
 		DWORD module_size;
 		DWORD image_base;
-		DWORD saved[3];
-		t_NS_data_dir data_dir[6];
+		DWORD unknown0;
+		DWORD saved;
+		DWORD unknown1;
+		t_NS_data_dir data_dir[NS_DATA_DIR_COUNT];
 		t_NS_section sections;
 	} t_NS_format;
 

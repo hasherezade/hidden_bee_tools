@@ -46,14 +46,14 @@ bool fill_nt_hdrs(t_NS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 
 	nt_hdr->Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI;
 
-	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = bee_hdr->data_dir[1].dir_va;
-	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = bee_hdr->data_dir[1].dir_size;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = bee_hdr->data_dir[NS_IMPORTS].dir_va;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = bee_hdr->data_dir[NS_IMPORTS].dir_size;
 
-	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress = bee_hdr->data_dir[3].dir_va;
-	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size = bee_hdr->data_dir[3].dir_size;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress = bee_hdr->data_dir[NS_RELOCATIONS].dir_va;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size = bee_hdr->data_dir[NS_RELOCATIONS].dir_size;
 
-	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT].VirtualAddress = bee_hdr->data_dir[4].dir_va;
-	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT].Size = bee_hdr->data_dir[4].dir_size;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT].VirtualAddress = bee_hdr->data_dir[NS_IAT].dir_va;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT].Size = bee_hdr->data_dir[NS_IAT].dir_size;
 	return true;
 }
 
@@ -111,12 +111,22 @@ void print_sections(t_NS_section *ns_section, size_t sections_count)
 	}
 }
 
+void print_saved_values(t_NS_format *bee_hdr, BYTE* bee_module, size_t bee_module_size)
+{
+	DWORD saved = bee_hdr->saved;
+	if (saved == 0) return;
+	std::cout << "Saved val :" << std::hex << saved << std::endl;
+	if (saved >= bee_module_size) return;
+	std::cout << (char*)(bee_module + saved) << std::endl;
+}
+
 bool ns_exe::unscramble_pe(BYTE *buf, size_t buf_size)
 {
 	t_NS_format *bee_hdr = (t_NS_format*)buf;
 
 	print_format(bee_hdr);
 	print_sections(&bee_hdr->sections, bee_hdr->sections_count);
+	print_saved_values(bee_hdr, buf, buf_size);
 
 	size_t rec_size = PAGE_SIZE;
 	if (bee_hdr->hdr_size > rec_size) return false;
@@ -150,13 +160,13 @@ bool ns_exe::unscramble_pe(BYTE *buf, size_t buf_size)
 		fill_nt_hdrs(bee_hdr, opt_hdr32);
 	}
 
-	file_hdrs->SizeOfOptionalHeader = opt_hdr_size;
+	file_hdrs->SizeOfOptionalHeader = (WORD)opt_hdr_size;
 	IMAGE_SECTION_HEADER *sec_hdr = (IMAGE_SECTION_HEADER*)((ULONG_PTR)opt_hdr + opt_hdr_size);
 
 	fill_sections(&bee_hdr->sections, sec_hdr, bee_hdr->sections_count);
 
 	//WARNING: if the file alignment differs from virtual alignmnent it needs to be converted!
-	DWORD imports_raw = bee_hdr->data_dir[1].dir_va;
+	DWORD imports_raw = bee_hdr->data_dir[NS_IMPORTS].dir_va;
 
 	t_NS_import *ns_import = (t_NS_import*)((ULONG_PTR)buf + imports_raw);
 	size_t dlls_count = count_imports(ns_import);
