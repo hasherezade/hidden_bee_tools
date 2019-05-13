@@ -9,11 +9,15 @@ BEE_TYPE check_type(BYTE *buf, size_t buf_size)
 	if (memcmp(buf, &MAGIC1, sizeof(MAGIC1)) == 0) {
 		return BEE_SCRAMBLED1;
 	}
+	if (memcmp(buf, &NS_MAGIC, sizeof(NS_MAGIC)) == 0) {
+		return BEE_NS_FORMAT;
+	}
 	return BEE_NONE;
 }
 
 template <typename T_BEE_SCRAMBLED>
-bool unscramble_pe(BYTE *buf, size_t buf_size) {
+bool unscramble_pe(BYTE *buf, size_t buf_size)
+{
 	T_BEE_SCRAMBLED *hdr = (T_BEE_SCRAMBLED*)buf;
 	std::cout << std::hex 
 		<< "Magic:     " << hdr->magic
@@ -50,6 +54,9 @@ bool unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
 	}
 	if (type == BEE_SCRAMBLED1) {
 		unscramble_pe<t_scrambled1>(buf, buf_size);
+	}
+	if (type == BEE_NS_FORMAT) {
+		ns_exe::unscramble_pe(buf, buf_size);
 	}
 	return true;
 }
