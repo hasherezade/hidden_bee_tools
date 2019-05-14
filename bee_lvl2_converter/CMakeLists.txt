@@ -20,7 +20,7 @@ set (hdrs
 )
 
 # Choose to build the DLL or EXE
-add_executable ( ${PROJECT_NAME} ${exe_hdrs} ${srcs} main.cpp )
+add_executable ( ${PROJECT_NAME} ${hdrs} ${srcs} main.cpp )
 
 # link with libpeconv.lib
 target_link_libraries ( ${PROJECT_NAME} ${PECONV_LIB} )
