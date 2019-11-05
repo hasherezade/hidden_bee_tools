@@ -2,7 +2,6 @@
 #include <windows.h>
 #include <peconv.h>
 
-
 #include "rdx.h"
 
 int main(int argc, char *argv[])
@@ -18,6 +17,6 @@ int main(int argc, char *argv[])
 		std::cout << "Could not open the file!\n";
 		return 0;
 	}
-	size_t count = rdx_fs::dump_modules(buf, buf_size);
+	const size_t count = rdx_fs::dump_modules(buf, buf_size);
 	return count;
 }
