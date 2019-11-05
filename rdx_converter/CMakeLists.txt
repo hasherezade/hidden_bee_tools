@@ -10,11 +10,13 @@ include_directories ( ${PECONV_DIR}/include )
 
 set (srcs
 	rdx.cpp
+	dir_util.cpp
 )
 
 # general headers - they will be used for both EXE and DLL:
 set (hdrs
 	rdx.h
+	dir_util.h
 )
 
 # Choose to build the DLL or EXE

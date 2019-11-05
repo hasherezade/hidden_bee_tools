@@ -2,6 +2,8 @@
 #include <iostream>
 #include <peconv.h>
 
+#include "dir_util.h"
+
 using namespace rdx_fs;
 
 bool is_rdx(BYTE* buf, size_t buf_size)
@@ -9,7 +11,7 @@ bool is_rdx(BYTE* buf, size_t buf_size)
 	if (!buf || !buf_size) return false;
 	const DWORD *magic = (DWORD*)buf;
 	if (*magic != RDX_MAGIC) {
-		std::cout << " Magic number mismatch: " << std::hex << *magic << " vs: " << RDX_MAGIC << "\n";
+		std::cout << "[!] Magic number mismatch: " << std::hex << *magic << " vs: " << RDX_MAGIC << "\n";
 		return false;
 	}
 	return true;
@@ -61,9 +63,16 @@ size_t rdx_fs::dump_modules(BYTE* buf, size_t buf_size)
 			break;
 		}
 		BYTE *content_ptr = buf + record->offset;
-		char *new_path = convert_name(record->name);
+		char *new_path = record->name;
+		std::string dir = get_directory_name(record->name);
+		if (dir.length() > 0) {
+			if (!create_dir_recursively(dir)) {
+				std::cout << "[!] Failed to create directory structure\n";
+				new_path = convert_name(record->name);
+			}
+		}
 		if (peconv::dump_to_file(new_path, content_ptr, record->size)) {
-			std::cout << "Saved to: " << new_path << "\n";
+			std::cout << "[*] Saved to: " << new_path << "\n";
 			count++;
 		}
 		if (record->next_record == 0) break;
