@@ -58,12 +58,14 @@ size_t rdx_fs::dump_modules(BYTE* buf, size_t buf_size)
 	size_t count = 0;
 	while (true) {
 		t_RDX_record *record = (t_RDX_record*)buf_ptr;
-		std::cout << record->name << "\n";
+		std::cout << "[*] " << record->name << "\n";
+
 		if (record->offset > buf_size || record->size > buf_size) {
 			break;
 		}
 		BYTE *content_ptr = buf + record->offset;
 		char *new_path = record->name;
+		
 		std::string dir = get_directory_name(record->name);
 		if (dir.length() > 0) {
 			if (!create_dir_recursively(dir)) {
