@@ -23,10 +23,10 @@ std::string translate_type(DWORD type)
 	switch (type) {
 	case RCX_PLAIN_SHELLCODE:
 		return "plain: shellcode";
-	case RCX_XOR_COMPRESSED_SHELLCODE:
-		return "XORed and compressed shellcode";
-	case RCX_UNK_C:
-		return "Unknown - type C";
+	case RCX_XOR_COMPRESSED_SHELLCODE32:
+		return "XORed and compressed shellcode (32 bit)";
+	case RCX_XOR_COMPRESSED_SHELLCODE64:
+		return "XORed and compressed shellcode (64 bit)";
 	case RCX_AES_KEY:
 		return "AES key";
 	case RCX_AES_LZMA_BLOB:
@@ -65,11 +65,24 @@ size_t rcx_fs::enum_modules(BYTE* buf, size_t buf_size)
 	return count;
 }
 
-std::string make_name(rcx_record *record, DWORD offset)
+std::string make_name(rcx_record *record, DWORD offset, char *extension)
 {
 	std::stringstream ss;
-	ss << std::hex << record->type << "_" << offset << ".bin";
+	ss << std::hex << record->type << "_" << offset << "." << extension;
 	return ss.str();
+}
+
+bool decode_module(rcx_record *record, DWORD offset)
+{
+	if (record->type == RCX_XOR_COMPRESSED_SHELLCODE32 || record->type == RCX_XOR_COMPRESSED_SHELLCODE64) {
+		util::dexor(record->data_buf, record->data_size, 0xE1);
+		std::string name1 = make_name(record, offset, "dec");
+		if (peconv::dump_to_file(name1.c_str(), record->data_buf, record->data_size)) {
+			std::cout << "[*] Saved to: " << name1 << "\n";
+			return true;
+		}
+	}
+	return false;
 }
 
 size_t rcx_fs::dump_modules(BYTE* buf, size_t buf_size)
@@ -85,11 +98,15 @@ size_t rcx_fs::dump_modules(BYTE* buf, size_t buf_size)
 		if (record->data_size == 0) {
 			break;
 		}
-		std::string name  = make_name(record, offset);
-		if (peconv::dump_to_file(name.c_str(), record->data_buf, record->data_size)) {
-			std::cout << "[*] Saved to: " << name << "\n";
+
+		std::string name1  = make_name(record, offset, "bin");
+		if (peconv::dump_to_file(name1.c_str(), record->data_buf, record->data_size)) {
+			std::cout << "[*] Saved to: " << name1 << "\n";
 			count++;
 		}
+#ifdef _DECODE
+		decode_module(record, offset);
+#endif
 		offset = record->next_offset;
 		if (offset == 0 || offset > buf_size) break;
 
