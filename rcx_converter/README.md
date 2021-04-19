@@ -1,4 +1,4 @@
-# rdx_converter
+# rcx_converter
 
 Extracts the modules from the HiddenBee's custom **!rcx** filesystem.
 
