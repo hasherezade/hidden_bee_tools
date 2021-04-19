@@ -21,11 +21,12 @@ size_t rdx_fs::enum_modules(BYTE* buf, size_t buf_size)
 {
 	if (!is_rdx(buf, buf_size)) return 0;
 
-	BYTE *buf_ptr = buf + sizeof(DWORD);
+	rdx_struct *rdx_buf = (rdx_struct*) buf;
 	size_t count = 0;
 
+	rdx_record *record = (rdx_record*)rdx_buf->records;
 	while (true) {
-		t_RDX_record *record = (t_RDX_record*)buf_ptr;
+		
 		if (record->offset > buf_size || record->size > buf_size) {
 			break;
 		}
@@ -35,7 +36,7 @@ size_t rdx_fs::enum_modules(BYTE* buf, size_t buf_size)
 		count++;
 
 		if (record->next_record == 0) break;
-		buf_ptr = buf + record->next_record;
+		record = (rdx_record*) buf + record->next_record;
 	}
 	return count;
 }
@@ -57,7 +58,7 @@ size_t rdx_fs::dump_modules(BYTE* buf, size_t buf_size)
 	BYTE *buf_ptr = buf + sizeof(DWORD);
 	size_t count = 0;
 	while (true) {
-		t_RDX_record *record = (t_RDX_record*)buf_ptr;
+		rdx_record *record = (rdx_record*)buf_ptr;
 		std::cout << "[*] " << record->name << "\n";
 
 		if (record->offset > buf_size || record->size > buf_size) {
