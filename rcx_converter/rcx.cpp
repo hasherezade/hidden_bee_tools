@@ -7,6 +7,8 @@
 
 using namespace rcx_fs;
 
+BYTE *g_AESKey = NULL;
+
 bool is_rcx(BYTE* buf, size_t buf_size)
 {
 	if (!buf || !buf_size) return false;
@@ -76,6 +78,19 @@ bool decode_module(rcx_record *record, DWORD offset)
 {
 	if (record->type == RCX_XOR_COMPRESSED_SHELLCODE32 || record->type == RCX_XOR_COMPRESSED_SHELLCODE64) {
 		util::dexor(record->data_buf, record->data_size, 0xE1);
+
+		std::string name1 = make_name(record, offset, "dec");
+		if (peconv::dump_to_file(name1.c_str(), record->data_buf, record->data_size)) {
+			std::cout << "[*] Saved to: " << name1 << "\n";
+			return true;
+		}
+	}
+	if (record->type == RCX_AES_KEY && record->data_size == 16) {
+		g_AESKey = record->data_buf;
+	}
+	if (record->type == RCX_AES_LZMA_BLOB && g_AESKey) {
+		util::aes_decrypt(record->data_buf, record->data_size, g_AESKey);
+
 		std::string name1 = make_name(record, offset, "dec");
 		if (peconv::dump_to_file(name1.c_str(), record->data_buf, record->data_size)) {
 			std::cout << "[*] Saved to: " << name1 << "\n";
@@ -104,6 +119,7 @@ size_t rcx_fs::dump_modules(BYTE* buf, size_t buf_size)
 			std::cout << "[*] Saved to: " << name1 << "\n";
 			count++;
 		}
+		
 #ifdef _DECODE
 		decode_module(record, offset);
 #endif

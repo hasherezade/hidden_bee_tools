@@ -7,16 +7,19 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
 
 # include libpeconv headers:
 include_directories ( ${PECONV_DIR}/include )
+include_directories ( tiny-AES-c )
 
 set (srcs
 	rcx.cpp
 	util.cpp
+	tiny-AES-c/aes.c
 )
 
 # general headers - they will be used for both EXE and DLL:
 set (hdrs
 	rcx.h
 	util.h
+	tiny-AES-c/aes.hpp
 )
 
 # Choose to build the DLL or EXE

@@ -1,3 +1,6 @@
 [submodule "libpeconv"]
 	path = libpeconv
 	url = https://github.com/hasherezade/libpeconv.git
+[submodule "rcx_converter/tiny-AES-c"]
+	path = rcx_converter/tiny-AES-c
+	url = https://github.com/kokke/tiny-AES-c.git
