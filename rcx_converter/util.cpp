@@ -3,6 +3,8 @@
 #include "aes.hpp"
 #include <peconv.h>
 
+#include "shellcode2.h"
+
 BYTE* util::dexor(BYTE *buf, size_t buf_size, BYTE key)
 {
 	for (size_t i = 0; i < buf_size; i++) {
@@ -108,3 +110,22 @@ int util::decompress(BYTE *in_buf, int in_size, BYTE *out_buf, unsigned int out_
 	return decompressed_size;
 #endif
 }
+
+int util::lzma_decompress(BYTE *in_buf, int in_size, BYTE *out_buf, unsigned int out_size)
+{
+	custom_iat iat = { 0 };
+	load_custom_iat(iat);
+
+	BYTE *buf = peconv::alloc_aligned(shellcode2_size, PAGE_EXECUTE_READWRITE);
+	memcpy(buf, shellcode2_data, shellcode2_size);
+
+	int(__stdcall *_lzma_decompress)(custom_iat *, BYTE *, DWORD *, BYTE *, int )
+		= (int(__stdcall *)(custom_iat *, BYTE *, DWORD *, BYTE *, int))(buf + 0x666);
+
+	DWORD decompressed_size = out_size;
+	_lzma_decompress(&iat, out_buf, &decompressed_size, in_buf, in_size);
+
+	peconv::free_aligned(buf);
+	return decompressed_size;
+}
+

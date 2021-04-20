@@ -18,4 +18,6 @@ namespace util {
 	BYTE* aes_decrypt(BYTE *buf, size_t buf_size, BYTE *key);
 
 	int decompress(BYTE *in_buf, int in_size, BYTE *out_buf, unsigned int out_size);
+
+	int lzma_decompress(BYTE *in_buf, int in_size, BYTE *out_buf, unsigned int out_size);
 };

@@ -5,6 +5,8 @@
 #include "util.h"
 #include <sstream>
 
+#define _DECODE
+
 using namespace rcx_fs;
 
 BYTE *g_AESKey = NULL;
@@ -99,11 +101,23 @@ bool decode_module(rcx_record *record, DWORD offset)
 	if (record->type == RCX_AES_LZMA_BLOB && g_AESKey) {
 		util::aes_decrypt(record->data_buf, record->data_size, g_AESKey);
 
-		std::string name1 = make_name(record, offset, "dec");
-		if (peconv::dump_to_file(name1.c_str(), record->data_buf, record->data_size)) {
-			std::cout << "[*] Saved to: " << name1 << "\n";
-			return true;
+		BYTE *out_buf = (BYTE *)malloc(record->output_size);
+		int count = util::lzma_decompress(record->data_buf, record->data_size, out_buf, record->output_size);
+		if (count != record->output_size) {
+			std::cout << "LZMA Decompression failed, out: " << count << " vs " << record->output_size << "\n";
+			free(out_buf);
+			return false;
 		}
+		DWORD *rdx = (DWORD*)(out_buf);
+		bool is_ok = (rdx && (*rdx == 'xdr!'));
+		if (is_ok) {
+			std::string name1 = make_name(record, offset, "rdx");
+			if (peconv::dump_to_file(name1.c_str(), out_buf, record->output_size)) {
+				std::cout << "[*] Saved to: " << name1 << "\n";
+			}
+		}
+		free(out_buf);
+		return is_ok;
 	}
 	return false;
 }
