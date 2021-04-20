@@ -13,6 +13,17 @@ BYTE* util::dexor(BYTE *buf, size_t buf_size, BYTE key)
 	return buf;
 }
 
+BYTE* util::find_marker(BYTE *buf, size_t buf_size, DWORD marker)
+{
+	BYTE *marker_ptr = (BYTE *)&marker;
+	for (BYTE *buf_ptr = buf; buf_ptr < (buf + buf_size - sizeof(marker)); buf_ptr++) {
+		if (memcmp(buf_ptr, marker_ptr, sizeof(marker)) == 0) {
+			return buf_ptr;
+		}
+	}
+	return nullptr;
+}
+
 BYTE* util::aes_decrypt(BYTE *buf, size_t buf_size, BYTE *key)
 {
 	struct AES_ctx ctx;
