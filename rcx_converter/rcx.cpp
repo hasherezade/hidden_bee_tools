@@ -78,12 +78,20 @@ bool decode_module(rcx_record *record, DWORD offset)
 {
 	if (record->type == RCX_XOR_COMPRESSED_SHELLCODE32 || record->type == RCX_XOR_COMPRESSED_SHELLCODE64) {
 		util::dexor(record->data_buf, record->data_size, 0xE1);
-
+		BYTE *out_buf = (BYTE *)malloc(record->output_size);
+		int count = util::decompress(record->data_buf, record->data_size, out_buf, record->output_size);
+		if (count != record->output_size) {
+			std::cout << "Decompression failed, out: " << count << " vs " << record->output_size << "\n";
+			free(out_buf);
+			return false;
+		}
 		std::string name1 = make_name(record, offset, "dec");
-		if (peconv::dump_to_file(name1.c_str(), record->data_buf, record->data_size)) {
+		if (peconv::dump_to_file(name1.c_str(), out_buf, record->output_size)) {
 			std::cout << "[*] Saved to: " << name1 << "\n";
+			free(out_buf);
 			return true;
 		}
+		free(out_buf);
 	}
 	if (record->type == RCX_AES_KEY && record->data_size == 16) {
 		g_AESKey = record->data_buf;
