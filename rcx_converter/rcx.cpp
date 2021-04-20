@@ -72,7 +72,7 @@ size_t rcx_fs::enum_modules(BYTE* buf, size_t buf_size)
 std::string make_name(rcx_record *record, DWORD offset, char *extension)
 {
 	std::stringstream ss;
-	ss << std::hex << record->type << "_" << offset << "." << extension;
+	ss << std::hex << record->type << "_" << offset << extension;
 	return ss.str();
 }
 
@@ -87,7 +87,7 @@ bool decode_module(rcx_record *record, DWORD offset)
 			free(out_buf);
 			return false;
 		}
-		std::string name1 = make_name(record, offset, "dec");
+		std::string name1 = make_name(record, offset, "_decoded.shc");
 		if (peconv::dump_to_file(name1.c_str(), out_buf, record->output_size)) {
 			std::cout << "[*] Saved to: " << name1 << "\n";
 			free(out_buf);
@@ -111,7 +111,7 @@ bool decode_module(rcx_record *record, DWORD offset)
 		DWORD *rdx = (DWORD*)(out_buf);
 		bool is_ok = (rdx && (*rdx == 'xdr!'));
 		if (is_ok) {
-			std::string name1 = make_name(record, offset, "rdx");
+			std::string name1 = make_name(record, offset, ".rdx");
 			if (peconv::dump_to_file(name1.c_str(), out_buf, record->output_size)) {
 				std::cout << "[*] Saved to: " << name1 << "\n";
 			}
@@ -136,7 +136,7 @@ size_t rcx_fs::dump_modules(BYTE* buf, size_t buf_size)
 			break;
 		}
 
-		std::string name1  = make_name(record, offset, "bin");
+		std::string name1  = make_name(record, offset, ".bin");
 		if (peconv::dump_to_file(name1.c_str(), record->data_buf, record->data_size)) {
 			std::cout << "[*] Saved to: " << name1 << "\n";
 			count++;
