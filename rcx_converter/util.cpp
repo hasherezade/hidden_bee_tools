@@ -113,6 +113,10 @@ int util::decompress(BYTE *in_buf, int in_size, BYTE *out_buf, unsigned int out_
 
 int util::lzma_decompress(BYTE *in_buf, int in_size, BYTE *out_buf, unsigned int out_size)
 {
+#ifdef _WIN64
+	std::cerr << "Compile the tool as 32 bit\n";
+	return 0;
+#else
 	custom_iat iat = { 0 };
 	load_custom_iat(iat);
 
@@ -127,5 +131,6 @@ int util::lzma_decompress(BYTE *in_buf, int in_size, BYTE *out_buf, unsigned int
 
 	peconv::free_aligned(buf);
 	return decompressed_size;
+#endif
 }
 
