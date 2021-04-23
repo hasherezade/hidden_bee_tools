@@ -1,4 +1,7 @@
 # Hidden Bee tools
+
+[![Build status](https://ci.appveyor.com/api/projects/status/pcbh0elgs3m6ua9o?svg=true)](https://ci.appveyor.com/project/hasherezade/hidden-bee-tools)
+
 Helper tools for analysis of Hidden Bee miner. Parsers and converters for Hidden Bee's custom executable formats.
 
 Clone:
