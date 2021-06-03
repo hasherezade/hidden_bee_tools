@@ -41,7 +41,7 @@ namespace ns_exe {
 		DWORD entry_point;
 		DWORD module_size;
 		DWORD image_base;
-		DWORD unknown0;
+		DWORD image_base_high;
 		DWORD saved;
 		DWORD unknown1;
 		t_NS_data_dir data_dir[NS_DATA_DIR_COUNT];
