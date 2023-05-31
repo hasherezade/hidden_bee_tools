@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "ns_exe.h"
+#include "rs_exe.h"
 
 const WORD MAGIC1 = 0x454e;
 const DWORD MAGIC2 = 0x0EF1FAB9;
@@ -12,6 +13,7 @@ enum BEE_TYPE {
 	BEE_NONE,
 	BEE_SCRAMBLED1,
 	BEE_NS_FORMAT,
+	BEE_RS_FORMAT,
 	BEE_SCRAMBLED2
 };
 
@@ -29,4 +31,4 @@ typedef struct {
 
 BEE_TYPE check_type(BYTE *buf, size_t buf_size);
 
-bool unscramble_bee_to_pe(BYTE *buf, size_t buf_size);
+BYTE* unscramble_bee_to_pe(BYTE *buf, size_t buf_size);

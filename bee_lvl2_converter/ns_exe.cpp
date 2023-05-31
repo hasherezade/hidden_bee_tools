@@ -2,17 +2,9 @@
 #include <peconv.h>
 #include <iostream>
 
-using namespace ns_exe;
+#include "util.h"
 
-DWORD gcd(DWORD a, DWORD b)
-{
-	while (b != 0) {
-		DWORD t = b;
-		b = a % b;
-		a = t;
-	}
-	return a;
-}
+using namespace ns_exe;
 
 DWORD calc_sec_alignment(t_NS_section *ns_section, size_t sections_count, bool is_virtual=true)
 {

@@ -12,6 +12,9 @@ BEE_TYPE check_type(BYTE *buf, size_t buf_size)
 	if (memcmp(buf, &NS_MAGIC, sizeof(NS_MAGIC)) == 0) {
 		return BEE_NS_FORMAT;
 	}
+	if (memcmp(buf, &RS_MAGIC, sizeof(RS_MAGIC)) == 0) {
+		return BEE_RS_FORMAT;
+	}
 	return BEE_NONE;
 }
 
@@ -41,22 +44,29 @@ bool unscramble_pe(BYTE *buf, size_t buf_size)
 	return true;
 }
 
-bool unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
+BYTE* unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
 {
+	BYTE* out_buf = buf;
 	BEE_TYPE type = check_type(buf, buf_size);
 	if (type == BEE_NONE) {
 		std::cout << "Not a Hidden Bee module!\n";
 		return false;
 	}
 	std::cout << "Type: " << type << std::endl;
-	if (type == BEE_SCRAMBLED2) {
+	switch (type) {
+	case BEE_SCRAMBLED2:
 		unscramble_pe<t_scrambled2>(buf, buf_size);
-	}
-	if (type == BEE_SCRAMBLED1) {
+		break;
+	case BEE_SCRAMBLED1:
 		unscramble_pe<t_scrambled1>(buf, buf_size);
-	}
-	if (type == BEE_NS_FORMAT) {
+		break;
+	case BEE_NS_FORMAT:
 		ns_exe::unscramble_pe(buf, buf_size);
+		break;
+	case BEE_RS_FORMAT:
+		out_buf = rs_exe::unscramble_pe(buf, buf_size);
+		break;
 	}
-	return true;
+	std::cout << "Returning unscrambled!\n";
+	return out_buf;
 }
