@@ -26,8 +26,8 @@ namespace rs_exe {
 
 	typedef struct {
 		DWORD dll_name_rva;
-		DWORD original_first_thunk;
 		DWORD first_thunk;
+		DWORD original_first_thunk;
 	} t_RS_import;
 
 	typedef struct {
