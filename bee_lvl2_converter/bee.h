@@ -31,4 +31,4 @@ typedef struct {
 
 BEE_TYPE check_type(BYTE *buf, size_t buf_size);
 
-BYTE* unscramble_bee_to_pe(BYTE *buf, size_t buf_size);
+BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size);

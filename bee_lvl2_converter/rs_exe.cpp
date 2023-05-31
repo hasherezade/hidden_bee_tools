@@ -188,14 +188,15 @@ protected:
 	}
 };
 
-BYTE* rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
+BLOB rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 {
+	BLOB mod = { 0 };
 	t_RS_format *bee_hdr = (t_RS_format*)in_buf;
 	size_t out_size = buf_size > bee_hdr->module_size ? buf_size : bee_hdr->module_size;
 	if (out_size < PAGE_SIZE) out_size = PAGE_SIZE;
 
 	BYTE* out_buf = (BYTE*)::malloc(out_size);
-	if (!out_buf) return nullptr;
+	if (!out_buf) return mod;
 
 	::memset(out_buf, 0, out_size);
 
@@ -203,7 +204,7 @@ BYTE* rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 	print_sections(&bee_hdr->sections, bee_hdr->sections_count);
 
 	size_t rec_size = PAGE_SIZE;
-	if (bee_hdr->hdr_size > rec_size) return false;
+	if (bee_hdr->hdr_size > rec_size) return mod;
 
 	BYTE *rec_hdr = new BYTE[rec_size];
 	memset(rec_hdr, 0, rec_size);
@@ -263,5 +264,7 @@ BYTE* rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 	ChecksumFiller collector(out_buf, out_size);
 	peconv::process_import_table(out_buf, out_size, &collector);
 	std::cout << "Finished...\n";
-	return out_buf;
+	mod.pBlobData = out_buf;
+	mod.cbSize = out_size;
+	return mod;
 }

@@ -44,13 +44,16 @@ bool unscramble_pe(BYTE *buf, size_t buf_size)
 	return true;
 }
 
-BYTE* unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
+BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
 {
-	BYTE* out_buf = buf;
+	BLOB mod = { 0 };
+	mod.pBlobData = buf;
+	mod.cbSize = buf_size;
+
 	BEE_TYPE type = check_type(buf, buf_size);
 	if (type == BEE_NONE) {
 		std::cout << "Not a Hidden Bee module!\n";
-		return false;
+		return mod;
 	}
 	std::cout << "Type: " << type << std::endl;
 	switch (type) {
@@ -64,9 +67,9 @@ BYTE* unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
 		ns_exe::unscramble_pe(buf, buf_size);
 		break;
 	case BEE_RS_FORMAT:
-		out_buf = rs_exe::unscramble_pe(buf, buf_size);
+		mod = rs_exe::unscramble_pe(buf, buf_size);
 		break;
 	}
 	std::cout << "Returning unscrambled!\n";
-	return out_buf;
+	return mod;
 }

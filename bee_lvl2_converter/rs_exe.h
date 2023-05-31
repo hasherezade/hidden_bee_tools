@@ -41,5 +41,5 @@ namespace rs_exe {
 		t_RS_section sections;
 	} t_RS_format;
 
-	BYTE* unscramble_pe(BYTE *buf, size_t buf_size);
+	BLOB unscramble_pe(BYTE *buf, size_t buf_size);
 };

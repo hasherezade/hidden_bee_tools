@@ -1,5 +1,6 @@
 #pragma once
 
+
 inline DWORD gcd(DWORD a, DWORD b)
 {
 	while (b != 0) {
