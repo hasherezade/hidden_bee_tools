@@ -1,6 +1,11 @@
 #include "rs_exe.h"
 #include <peconv.h>
 #include <iostream>
+
+#include <string>
+#include <map>
+#include <vector>
+
 #include "util.h"
 using namespace rs_exe;
 
@@ -104,6 +109,85 @@ void copy_sections(t_RS_format* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out
 	}
 }
 
+DWORD calc_checksum(BYTE* a1)
+{
+	BYTE* ptr; // edx
+	unsigned int result; // eax
+	char i; // cl
+	int v4; // esi
+	int v5; // eax
+
+	ptr = a1;
+	result = 0;
+	for (i = *a1; i; ++ptr)
+	{
+		v4 = (result >> 13) | (result << 19);
+		v5 = i;
+		i = ptr[1];
+		result = v4 + v5;
+	}
+	return result;
+}
+
+class ChecksumFiller : public peconv::ImportThunksCallback
+{
+public:
+	ChecksumFiller(BYTE* _modulePtr, size_t _moduleSize)
+		: ImportThunksCallback(_modulePtr, _moduleSize)
+	{
+	}
+
+	virtual bool processThunks(LPSTR lib_name, ULONG_PTR origFirstThunkPtr, ULONG_PTR firstThunkPtr)
+	{
+		if (this->is64b) {
+			IMAGE_THUNK_DATA64* desc = reinterpret_cast<IMAGE_THUNK_DATA64*>(origFirstThunkPtr);
+			ULONGLONG* call_via = reinterpret_cast<ULONGLONG*>(firstThunkPtr);
+			return processThunks_tpl<ULONGLONG, IMAGE_THUNK_DATA64>(lib_name, desc, call_via, IMAGE_ORDINAL_FLAG64);
+
+		}
+		else {
+
+			IMAGE_THUNK_DATA32* desc = reinterpret_cast<IMAGE_THUNK_DATA32*>(origFirstThunkPtr);
+			DWORD* call_via = reinterpret_cast<DWORD*>(firstThunkPtr);
+			return processThunks_tpl<DWORD, IMAGE_THUNK_DATA32>(lib_name, desc, call_via, IMAGE_ORDINAL_FLAG32);
+		}
+	}
+
+protected:
+	template <typename T_FIELD, typename T_IMAGE_THUNK_DATA>
+	bool processThunks_tpl(LPSTR lib_name, T_IMAGE_THUNK_DATA* desc, T_FIELD* call_via, T_FIELD ordinal_flag)
+	{
+		if (call_via == nullptr) {
+			return false;
+		}
+
+		//thunkToFunc[rva] = func;
+		const std::string short_name = peconv::get_dll_shortname(lib_name);
+		const bool is_by_ord = (desc->u1.Ordinal & ordinal_flag) != 0;
+		if (is_by_ord) {
+			return true;
+		}
+		PIMAGE_IMPORT_BY_NAME by_name = (PIMAGE_IMPORT_BY_NAME)((ULONGLONG)modulePtr + desc->u1.AddressOfData);
+		const DWORD rva = MASK_TO_DWORD((ULONG_PTR)by_name->Name - (ULONG_PTR)modulePtr);
+		DWORD* checks = (DWORD*)(by_name);
+
+		std::vector<std::string> names;
+		HMODULE lib = LoadLibraryA(lib_name);
+		if (!lib) return false;
+
+		peconv::get_exported_names(lib, names);
+		for (auto itr = names.begin(); itr != names.end(); itr++) {
+			DWORD checks1 = calc_checksum((BYTE*)itr->c_str());
+			if (checks1 == (*checks)) {
+				::memcpy(by_name->Name, itr->c_str(), itr->length());
+				break;
+			}
+		}
+		FreeLibrary(lib);
+		return true;
+	}
+};
+
 BYTE* rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 {
 	t_RS_format *bee_hdr = (t_RS_format*)in_buf;
@@ -175,6 +259,9 @@ BYTE* rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 
 	memcpy(out_buf + imports_raw, rec_imports, imp_area_size);
 	delete[]rec_imports; rec_imports = nullptr;
+
+	ChecksumFiller collector(out_buf, out_size);
+	peconv::process_import_table(out_buf, out_size, &collector);
 	std::cout << "Finished...\n";
 	return out_buf;
 }
