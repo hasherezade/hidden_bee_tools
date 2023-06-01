@@ -39,6 +39,12 @@ namespace hs_exe {
 		}
 		return min;
 	}
+
+	uint64_t make_img_base(t_HS_format* bee_hdr)
+	{
+		const uint64_t img_base = ((uint64_t)bee_hdr->module_base_hi) << (sizeof(DWORD) * 8) | bee_hdr->module_base_low;
+		return img_base;
+	}
 }
 
 template <typename T_IMAGE_OPTIONAL_HEADER>
@@ -48,7 +54,7 @@ bool fill_nt_hdrs(t_HS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 	nt_hdr->SectionAlignment = calc_sec_alignment(&bee_hdr->sections, bee_hdr->sections_count, true);
 	nt_hdr->FileAlignment = nt_hdr->SectionAlignment;
 
-	nt_hdr->ImageBase = bee_hdr->module_base;
+	nt_hdr->ImageBase = make_img_base(bee_hdr);
 	nt_hdr->AddressOfEntryPoint = bee_hdr->entry_point;
 
 	nt_hdr->SizeOfHeaders = kMinAlign;// bee_hdr->hdr_size;
@@ -107,8 +113,9 @@ namespace hs_exe {
 			<< "\nEP:            " << bee_hdr->entry_point
 			<< "\nModuleSize:    " << bee_hdr->module_size
 			<< "\nSectionsCount: " << bee_hdr->sections_count
-			<< "\nImgBase:       " << bee_hdr->module_base
-			<< "\nUnk2:       " << bee_hdr->unk2
+			<< "\nUnk1:          " << bee_hdr->unk1
+			<< "\nImgBase:       " << make_img_base(bee_hdr)
+			<< "\nUnk2:          " << bee_hdr->unk2
 			<< "\n" << std::endl;
 	}
 };
@@ -173,6 +180,7 @@ BLOB hs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 		IMAGE_OPTIONAL_HEADER64* opt_hdr64 = (IMAGE_OPTIONAL_HEADER64*)opt_hdr;
 		opt_hdr64->Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC;
 		fill_nt_hdrs(bee_hdr, opt_hdr64);
+
 	}
 	else {
 		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER32);

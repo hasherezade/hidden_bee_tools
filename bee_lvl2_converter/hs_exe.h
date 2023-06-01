@@ -37,9 +37,9 @@ namespace hs_exe {
 		WORD hdr_size;
 		DWORD entry_point;
 		DWORD module_size;
-		DWORD unk0;
 		DWORD unk1;
-		DWORD module_base;
+		DWORD module_base_hi;
+		DWORD module_base_low;
 		DWORD unk2;
 		t_HS_data_dir data_dir[HS_DATA_DIR_COUNT];
 		t_HS_section sections;
