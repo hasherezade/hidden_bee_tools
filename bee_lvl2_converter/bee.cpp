@@ -47,14 +47,15 @@ bool unscramble_pe(BYTE *buf, size_t buf_size)
 BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
 {
 	BLOB mod = { 0 };
-	mod.pBlobData = buf;
-	mod.cbSize = buf_size;
-
 	BEE_TYPE type = check_type(buf, buf_size);
 	if (type == BEE_NONE) {
 		std::cout << "Not a Hidden Bee module!\n";
 		return mod;
 	}
+
+	mod.pBlobData = buf;
+	mod.cbSize = buf_size;
+
 	std::cout << "Type: " << type << std::endl;
 	switch (type) {
 	case BEE_SCRAMBLED2:
