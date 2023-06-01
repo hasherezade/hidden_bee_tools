@@ -5,6 +5,7 @@
 
 #include "ns_exe.h"
 #include "rs_exe.h"
+#include "hs_exe.h"
 
 const WORD MAGIC1 = 0x454e;
 const DWORD MAGIC2 = 0x0EF1FAB9;
@@ -14,6 +15,7 @@ enum BEE_TYPE {
 	BEE_SCRAMBLED1,
 	BEE_NS_FORMAT,
 	BEE_RS_FORMAT,
+	BEE_HS_FORMAT,
 	BEE_SCRAMBLED2
 };
 

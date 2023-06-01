@@ -15,6 +15,9 @@ BEE_TYPE check_type(BYTE *buf, size_t buf_size)
 	if (memcmp(buf, &RS_MAGIC, sizeof(RS_MAGIC)) == 0) {
 		return BEE_RS_FORMAT;
 	}
+	if (memcmp(buf, &HS_MAGIC, sizeof(HS_MAGIC)) == 0) {
+		return BEE_HS_FORMAT;
+	}
 	return BEE_NONE;
 }
 
@@ -70,7 +73,11 @@ BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
 	case BEE_RS_FORMAT:
 		mod = rs_exe::unscramble_pe(buf, buf_size);
 		break;
+	case BEE_HS_FORMAT:
+		mod = hs_exe::unscramble_pe(buf, buf_size);
+		break;
 	}
+
 	std::cout << "Returning unscrambled!\n";
 	return mod;
 }

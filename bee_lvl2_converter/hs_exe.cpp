@@ -1,4 +1,4 @@
-#include "rs_exe.h"
+#include "hs_exe.h"
 #include <peconv.h>
 #include <iostream>
 
@@ -7,11 +7,10 @@
 #include <vector>
 
 #include "util.h"
-using namespace rs_exe;
+using namespace hs_exe;
 
-
-namespace rs_exe {
-	DWORD calc_sec_alignment(t_RS_section* section, size_t sections_count, bool is_virtual = true)
+namespace hs_exe {
+	DWORD calc_sec_alignment(t_HS_section* section, size_t sections_count, bool is_virtual = true)
 	{
 		DWORD prev = 0;
 		for (size_t i = 0; i < sections_count; i++) {
@@ -26,7 +25,7 @@ namespace rs_exe {
 		return prev;
 	}
 
-	DWORD get_first_section(t_RS_section* section, size_t sections_count, bool is_virtual = true)
+	DWORD get_first_section(t_HS_section* section, size_t sections_count, bool is_virtual = true)
 	{
 		DWORD min = 0;
 		for (size_t i = 0; i < sections_count; i++) {
@@ -43,13 +42,13 @@ namespace rs_exe {
 }
 
 template <typename T_IMAGE_OPTIONAL_HEADER>
-bool fill_nt_hdrs(t_RS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
+bool fill_nt_hdrs(t_HS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 {
 	const int kMinAlign = get_first_section(&bee_hdr->sections, bee_hdr->sections_count, true);
 	nt_hdr->SectionAlignment = calc_sec_alignment(&bee_hdr->sections, bee_hdr->sections_count, true);
 	nt_hdr->FileAlignment = nt_hdr->SectionAlignment;
 
-	nt_hdr->ImageBase = 0;
+	nt_hdr->ImageBase = bee_hdr->module_base;
 	nt_hdr->AddressOfEntryPoint = bee_hdr->entry_point;
 
 	nt_hdr->SizeOfHeaders = kMinAlign;// bee_hdr->hdr_size;
@@ -57,18 +56,18 @@ bool fill_nt_hdrs(t_RS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 
 	nt_hdr->Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI;
 
-	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = bee_hdr->data_dir[RS_IMPORTS].dir_va;
-	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = bee_hdr->data_dir[RS_IMPORTS].dir_size;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = bee_hdr->data_dir[HS_IMPORTS].dir_va;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = bee_hdr->data_dir[HS_IMPORTS].dir_size;
 
-	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress = bee_hdr->data_dir[RS_RELOCATIONS].dir_va;
-	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size = bee_hdr->data_dir[RS_RELOCATIONS].dir_size;
-
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress = bee_hdr->data_dir[HS_RELOCATIONS].dir_va;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size = bee_hdr->data_dir[HS_RELOCATIONS].dir_size;
 	return true;
 }
 
-bool fill_sections(t_RS_section *rs_section, IMAGE_SECTION_HEADER *sec_hdr, size_t sections_count)
+bool fill_sections(t_HS_section* rs_section, IMAGE_SECTION_HEADER* sec_hdr, size_t sections_count)
 {
 	for (size_t i = 0; i < sections_count; i++) {
+
 		sec_hdr[i].VirtualAddress = rs_section[i].va;
 		sec_hdr[i].PointerToRawData = rs_section[i].va;
 		sec_hdr[i].SizeOfRawData = rs_section[i].size;
@@ -78,7 +77,7 @@ bool fill_sections(t_RS_section *rs_section, IMAGE_SECTION_HEADER *sec_hdr, size
 	return true;
 }
 
-size_t count_imports(t_RS_import *rs_import)
+size_t count_imports(t_HS_import *rs_import)
 {
 	for (size_t i = 0; true; i++) {
 		if (rs_import[i].first_thunk == 0 && rs_import[i].original_first_thunk == 0) {
@@ -88,7 +87,7 @@ size_t count_imports(t_RS_import *rs_import)
 	return 0;
 }
 
-bool fill_imports(t_RS_import *rs_import, IMAGE_IMPORT_DESCRIPTOR *imp_desc, size_t dlls_count)
+bool fill_imports(t_HS_import *rs_import, IMAGE_IMPORT_DESCRIPTOR *imp_desc, size_t dlls_count)
 {
 	for (size_t i = 0; i < dlls_count; i++) {
 		if (rs_import[i].first_thunk == 0 && rs_import[i].original_first_thunk == 0) break;
@@ -98,18 +97,24 @@ bool fill_imports(t_RS_import *rs_import, IMAGE_IMPORT_DESCRIPTOR *imp_desc, siz
 	}
 	return true;
 }
+namespace hs_exe {
+	void print_format(t_HS_format* bee_hdr)
+	{
+		std::cout << "Format: HS\n";
+		std::cout << std::hex
+			<< "Magic:         " << bee_hdr->magic
+			<< "\nMachineId:     " << bee_hdr->machine_id
+			<< "\nEP:            " << bee_hdr->entry_point
+			<< "\nModuleSize:    " << bee_hdr->module_size
+			<< "\nSectionsCount: " << bee_hdr->sections_count
+			<< "\nImgBase:       " << bee_hdr->module_base
+			<< "\nUnk2:       " << bee_hdr->unk2
+			<< "\n" << std::endl;
+	}
+};
 
-void print_format(t_RS_format *bee_hdr)
-{
-	std::cout << std::hex
-		<<   "Magic:         " << bee_hdr->magic
-		<< "\nMachineId:     " << bee_hdr->machine_id
-		<< "\nEP:            " << bee_hdr->entry_point
-		<< "\nModuleSize:    " << bee_hdr->module_size 
-		<< "\n" << std::endl;
-}
 
-void print_sections(t_RS_section *rs_section, size_t sections_count)
+void print_sections(t_HS_section *rs_section, size_t sections_count)
 {
 	std::cout << "---SECTIONS---\n";
 	for (size_t i = 0; i < sections_count; i++) {
@@ -119,98 +124,20 @@ void print_sections(t_RS_section *rs_section, size_t sections_count)
 	}
 }
 
-void copy_sections(t_RS_format* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out_size)
+void copy_sections(t_HS_format* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out_size, bool isMapped)
 {
-	t_RS_section* rs_section = &bee_hdr->sections;
+	t_HS_section* rs_section = &bee_hdr->sections;
 	for (size_t i = 0; i < bee_hdr->sections_count; i++) {
-		::memcpy((BYTE*)((ULONG_PTR)out_buf + rs_section[i].va), (BYTE*)((ULONG_PTR)in_buf + rs_section[i].raw_addr), rs_section[i].size);
+		const DWORD raw = isMapped ? rs_section[i].va : rs_section[i].raw_addr;
+		::memcpy((BYTE*)((ULONG_PTR)out_buf + rs_section[i].va), (BYTE*)((ULONG_PTR)in_buf + raw), rs_section[i].size);
 	}
 }
-namespace rs_exe {
-	DWORD calc_checksum(BYTE* a1)
-	{
-		BYTE* ptr; // edx
-		unsigned int result; // eax
-		char i; // cl
-		int v4; // esi
-		int v5; // eax
 
-		ptr = a1;
-		result = 0;
-		for (i = *a1; i; ++ptr)
-		{
-			v4 = (result >> 13) | (result << 19);
-			v5 = i;
-			i = ptr[1];
-			result = v4 + v5;
-		}
-		return result;
-	}
-};
-
-class ChecksumFiller : public peconv::ImportThunksCallback
+BLOB hs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 {
-public:
-	ChecksumFiller(BYTE* _modulePtr, size_t _moduleSize)
-		: ImportThunksCallback(_modulePtr, _moduleSize)
-	{
-	}
-
-	virtual bool processThunks(LPSTR lib_name, ULONG_PTR origFirstThunkPtr, ULONG_PTR firstThunkPtr)
-	{
-		if (this->is64b) {
-			IMAGE_THUNK_DATA64* desc = reinterpret_cast<IMAGE_THUNK_DATA64*>(origFirstThunkPtr);
-			ULONGLONG* call_via = reinterpret_cast<ULONGLONG*>(firstThunkPtr);
-			return processThunks_tpl<ULONGLONG, IMAGE_THUNK_DATA64>(lib_name, desc, call_via, IMAGE_ORDINAL_FLAG64);
-
-		}
-		else {
-
-			IMAGE_THUNK_DATA32* desc = reinterpret_cast<IMAGE_THUNK_DATA32*>(origFirstThunkPtr);
-			DWORD* call_via = reinterpret_cast<DWORD*>(firstThunkPtr);
-			return processThunks_tpl<DWORD, IMAGE_THUNK_DATA32>(lib_name, desc, call_via, IMAGE_ORDINAL_FLAG32);
-		}
-	}
-
-protected:
-	template <typename T_FIELD, typename T_IMAGE_THUNK_DATA>
-	bool processThunks_tpl(LPSTR lib_name, T_IMAGE_THUNK_DATA* desc, T_FIELD* call_via, T_FIELD ordinal_flag)
-	{
-		if (call_via == nullptr) {
-			return false;
-		}
-
-		//thunkToFunc[rva] = func;
-		const std::string short_name = peconv::get_dll_shortname(lib_name);
-		const bool is_by_ord = (desc->u1.Ordinal & ordinal_flag) != 0;
-		if (is_by_ord) {
-			return true;
-		}
-		PIMAGE_IMPORT_BY_NAME by_name = (PIMAGE_IMPORT_BY_NAME)((ULONGLONG)modulePtr + desc->u1.AddressOfData);
-		const DWORD rva = MASK_TO_DWORD((ULONG_PTR)by_name->Name - (ULONG_PTR)modulePtr);
-		DWORD* checks = (DWORD*)(by_name);
-
-		std::vector<std::string> names;
-		HMODULE lib = LoadLibraryA(lib_name);
-		if (!lib) return false;
-
-		peconv::get_exported_names(lib, names);
-		for (auto itr = names.begin(); itr != names.end(); itr++) {
-			DWORD checks1 = rs_exe::calc_checksum((BYTE*)itr->c_str());
-			if (checks1 == (*checks)) {
-				::memcpy(by_name->Name, itr->c_str(), itr->length());
-				break;
-			}
-		}
-		FreeLibrary(lib);
-		return true;
-	}
-};
-
-BLOB rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
-{
+	bool isMapped = true;
 	BLOB mod = { 0 };
-	t_RS_format *bee_hdr = (t_RS_format*)in_buf;
+	t_HS_format *bee_hdr = (t_HS_format*)in_buf;
 	size_t out_size = buf_size > bee_hdr->module_size ? buf_size : bee_hdr->module_size;
 	if (out_size < PAGE_SIZE) out_size = PAGE_SIZE;
 
@@ -219,10 +146,10 @@ BLOB rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 
 	::memset(out_buf, 0, out_size);
 
-	print_format(bee_hdr);
+	hs_exe::print_format(bee_hdr);
 	print_sections(&bee_hdr->sections, bee_hdr->sections_count);
 
-	size_t rec_size = PAGE_SIZE;
+	const size_t rec_size = PAGE_SIZE;
 	if (bee_hdr->hdr_size > rec_size) return mod;
 
 	BYTE *rec_hdr = new BYTE[rec_size];
@@ -256,21 +183,22 @@ BLOB rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 
 	file_hdrs->SizeOfOptionalHeader = (WORD)opt_hdr_size;
 	IMAGE_SECTION_HEADER *sec_hdr = (IMAGE_SECTION_HEADER*)((ULONG_PTR)opt_hdr + opt_hdr_size);
-
+	peconv::dump_to_file("rec_hdr1.bin", rec_hdr, rec_size);
 	fill_sections(&bee_hdr->sections, sec_hdr, bee_hdr->sections_count);
 
-	::memcpy(out_buf, rec_hdr, rec_size);
+	peconv::dump_to_file("rec_hdr2.bin", rec_hdr, rec_size);
+	::memcpy(out_buf, rec_hdr, PAGE_SIZE);
 	delete[]rec_hdr; rec_hdr = nullptr;
 
-	copy_sections(bee_hdr, in_buf, out_buf, out_size);
-
+	copy_sections(bee_hdr, in_buf, out_buf, out_size, isMapped);
+	
 	//WARNING: if the file alignment differs from virtual alignmnent it needs to be converted!
-	DWORD imports_raw = bee_hdr->data_dir[RS_IMPORTS].dir_va;
+	DWORD imports_raw = bee_hdr->data_dir[HS_IMPORTS].dir_va;
 
-	t_RS_import *rs_import = (t_RS_import*)((ULONG_PTR)out_buf + imports_raw);
+	t_HS_import *rs_import = (t_HS_import*)((ULONG_PTR)out_buf + imports_raw);
 	size_t dlls_count = count_imports(rs_import);
 
-	std::cout << "DLLs count: " << dlls_count << std::endl;
+	//std::cout << "DLLs count: " << dlls_count << std::endl;
 	const size_t imp_area_size = dlls_count * sizeof(IMAGE_IMPORT_DESCRIPTOR);
 
 	BYTE *rec_imports = new BYTE[imp_area_size];
@@ -280,8 +208,6 @@ BLOB rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 	memcpy(out_buf + imports_raw, rec_imports, imp_area_size);
 	delete[]rec_imports; rec_imports = nullptr;
 
-	ChecksumFiller collector(out_buf, out_size);
-	peconv::process_import_table(out_buf, out_size, &collector);
 	std::cout << "Finished...\n";
 	mod.pBlobData = out_buf;
 	mod.cbSize = out_size;

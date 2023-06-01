@@ -12,6 +12,7 @@ set (srcs
 	bee.cpp
 	ns_exe.cpp
 	rs_exe.cpp
+	hs_exe.cpp
 )
 
 # general headers - they will be used for both EXE and DLL:
@@ -19,6 +20,7 @@ set (hdrs
 	bee.h
 	ns_exe.h
 	rs_exe.h
+	hs_exe.h
 	util.h
 )
 
