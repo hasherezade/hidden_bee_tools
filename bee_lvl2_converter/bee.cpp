@@ -13,10 +13,13 @@ BEE_TYPE check_type(BYTE *buf, size_t buf_size)
 		return BEE_NS_FORMAT;
 	}
 	if (memcmp(buf, &RS_MAGIC, sizeof(RS_MAGIC)) == 0) {
-		return BEE_RS_FORMAT;
+		return RHADAM_RS_FORMAT;
 	}
 	if (memcmp(buf, &HS_MAGIC, sizeof(HS_MAGIC)) == 0) {
-		return BEE_HS_FORMAT;
+		return RHADAM_HS_FORMAT;
+	}
+	if (memcmp(buf, &XS_MAGIC, sizeof(XS_MAGIC)) == 0) {
+		return RHADAM_XS_FORMAT;
 	}
 	return BEE_NONE;
 }
@@ -70,11 +73,14 @@ BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
 	case BEE_NS_FORMAT:
 		ns_exe::unscramble_pe(buf, buf_size);
 		break;
-	case BEE_RS_FORMAT:
+	case RHADAM_RS_FORMAT:
 		mod = rs_exe::unscramble_pe(buf, buf_size);
 		break;
-	case BEE_HS_FORMAT:
+	case RHADAM_HS_FORMAT:
 		mod = hs_exe::unscramble_pe(buf, buf_size);
+		break;
+	case RHADAM_XS_FORMAT:
+		mod = xs_exe::unscramble_pe(buf, buf_size);
 		break;
 	}
 
