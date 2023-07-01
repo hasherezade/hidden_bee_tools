@@ -10,6 +10,7 @@ namespace xs_exe {
 
 	enum data_dir_id {
 		XS_IMPORTS = 0,
+		XS_EXCEPTIONS = 1,
 		XS_RELOCATIONS = 2
 	};
 

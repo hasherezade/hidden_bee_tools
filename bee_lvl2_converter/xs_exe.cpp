@@ -60,6 +60,9 @@ bool fill_nt_hdrs(t_XS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = bee_hdr->data_dir[XS_IMPORTS].dir_va;
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = bee_hdr->data_dir[XS_IMPORTS].dir_size;
 
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress = bee_hdr->data_dir[XS_EXCEPTIONS].dir_va;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].Size = bee_hdr->data_dir[XS_EXCEPTIONS].dir_size;
+
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress = bee_hdr->data_dir[XS_RELOCATIONS].dir_va;
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size = bee_hdr->data_dir[XS_RELOCATIONS].dir_size;
 
@@ -140,6 +143,7 @@ void print_format(t_XS_format *bee_hdr)
 		<< "\nEP:            " << bee_hdr->entry_point
 		<< "\nModuleSize:    " << bee_hdr->module_size 
 		<< "\nSec count:     " << bee_hdr->sections_count
+		<< "\nHdr Size:      " << bee_hdr->hdr_size
 		<< "\nNT magic:      " << bee_hdr->nt_magic
 		<< "\nImp Key:       " << bee_hdr->imp_key
 		<< "\nUnk2           " << bee_hdr->unk_2
