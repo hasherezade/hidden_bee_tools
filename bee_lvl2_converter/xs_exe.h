@@ -34,7 +34,7 @@ namespace xs_exe {
 
 	typedef struct {
 		WORD magic;
-		WORD unk_1;
+		WORD nt_magic;
 		WORD sections_count;
 		WORD imp_key;
 		WORD hdr_size;

@@ -139,7 +139,8 @@ void print_format(t_XS_format *bee_hdr)
 		<<  "Magic:         " << bee_hdr->magic
 		<< "\nEP:            " << bee_hdr->entry_point
 		<< "\nModuleSize:    " << bee_hdr->module_size 
-		<< "\nUnk1           " << bee_hdr->unk_1
+		<< "\nSec count:     " << bee_hdr->sections_count
+		<< "\nNT magic:      " << bee_hdr->nt_magic
 		<< "\nImp Key:       " << bee_hdr->imp_key
 		<< "\nUnk2           " << bee_hdr->unk_2
 		<< "\n" << std::endl;
@@ -281,7 +282,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 	*pe_ptr = IMAGE_NT_SIGNATURE;
 
 	IMAGE_FILE_HEADER* file_hdrs = (IMAGE_FILE_HEADER*)((ULONG_PTR)rec_hdr + dos_hdr->e_lfanew + sizeof(IMAGE_NT_SIGNATURE));
-	file_hdrs->Machine = IMAGE_FILE_MACHINE_I386; // 32 bit only
+	file_hdrs->Machine = (bee_hdr->nt_magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) ? IMAGE_FILE_MACHINE_AMD64 : IMAGE_FILE_MACHINE_I386; // 32 bit only
 	file_hdrs->NumberOfSections = bee_hdr->sections_count;
 
 	BYTE *opt_hdr = (BYTE*)((ULONG_PTR)file_hdrs + sizeof(IMAGE_FILE_HEADER));
