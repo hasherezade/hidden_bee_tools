@@ -124,7 +124,7 @@ bool fill_imports(BYTE* mapped_xs, t_XS_import *rs_import, IMAGE_IMPORT_DESCRIPT
 			<< "first_thunk: " << std::hex << rs_import[i].first_thunk << "\t"
 			<< "original_first_thunk: " << std::hex << rs_import[i].original_first_thunk << "\t"
 			<< "dll_name_rva: " << rs_import[i].dll_name_rva << "\t"
-			<< "Unk: " << rs_import[i].unk0 << " : " << (char)rs_import[i].unk0 << "\n";
+			<< "Unk: " << rs_import[i].obf_dll_len << "\n";
 
 		std::cout << "Decoding name at: " << std::hex << rs_import[i].dll_name_rva << "\n";
 		BYTE* lib_name = (BYTE*)((ULONG_PTR)mapped_xs + rs_import[i].dll_name_rva);
@@ -174,15 +174,14 @@ void copy_sections(t_XS_format* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out
 }
 namespace xs_exe {
 
-	DWORD calc_checksum(BYTE* name_ptr, DWORD imp_key)
+	int calc_checksum(BYTE* name_ptr, int imp_key)
 	{
-		DWORD res = 0;
 		while (*name_ptr)
 		{
-			DWORD val = (unsigned __int8)*name_ptr++ ^ (16777619 * imp_key);
-			res = val;
+			int val = (unsigned __int8)*name_ptr++ ^ (16777619 * imp_key);
+			imp_key = val;
 		}
-		return res;
+		return imp_key;
 	}
 };
 
@@ -203,10 +202,8 @@ namespace xs_exe {
 				IMAGE_THUNK_DATA64* desc = reinterpret_cast<IMAGE_THUNK_DATA64*>(origFirstThunkPtr);
 				ULONGLONG* call_via = reinterpret_cast<ULONGLONG*>(firstThunkPtr);
 				return processThunks_tpl<ULONGLONG, IMAGE_THUNK_DATA64>(lib_name, desc, call_via, IMAGE_ORDINAL_FLAG64);
-
 			}
 			else {
-
 				IMAGE_THUNK_DATA32* desc = reinterpret_cast<IMAGE_THUNK_DATA32*>(origFirstThunkPtr);
 				DWORD* call_via = reinterpret_cast<DWORD*>(firstThunkPtr);
 				return processThunks_tpl<DWORD, IMAGE_THUNK_DATA32>(lib_name, desc, call_via, IMAGE_ORDINAL_FLAG32);
@@ -226,7 +223,6 @@ namespace xs_exe {
 			const std::string short_name = peconv::get_dll_shortname(lib_name);
 			const bool is_by_ord = (desc->u1.Ordinal & ordinal_flag) != 0;
 			if (is_by_ord) {
-				std::cout << "By ordinal!\n";
 				return true;
 			}
 			PIMAGE_IMPORT_BY_NAME by_name = (PIMAGE_IMPORT_BY_NAME)((ULONGLONG)modulePtr + desc->u1.AddressOfData);
@@ -235,23 +231,22 @@ namespace xs_exe {
 			std::vector<std::string> names;
 			HMODULE lib = LoadLibraryA(lib_name);
 			if (!lib) return false;
-			DWORD* checks_ptr = (DWORD*)((ULONG_PTR)by_name);
-			DWORD curr_checks = (*checks_ptr) + checks_offset;
-			std::cout << "Searching the checksum: " << curr_checks << " in: " << lib_name << "\n";
+
+
+			DWORD* checks_ptr = (DWORD*)(by_name->Name);
+			DWORD curr_checks = (*checks_ptr);// +checks_offset;
+			//std::cout << "Searching the checksum: " << curr_checks << " in: " << lib_name << "\n";
 			peconv::get_exported_names(lib, names);
 			for (auto itr = names.begin(); itr != names.end(); itr++) {
 				DWORD checks1 = xs_exe::calc_checksum((BYTE*)itr->c_str(), imp_key);
 				if (checks1 == curr_checks) {
 					::memcpy(by_name->Name, itr->c_str(), itr->length());
-					std::cout << "Checksum found!\n";
 					break;
 				}
 			}
 			FreeLibrary(lib);
 			return true;
 		}
-
-
 		DWORD imp_key;
 		DWORD checks_offset;
 		t_XS_data_dir& imps;
