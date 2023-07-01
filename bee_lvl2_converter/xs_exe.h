@@ -34,11 +34,11 @@ namespace xs_exe {
 
 	typedef struct {
 		WORD magic;
-		WORD imp_checksums_rva;
+		WORD unk_1;
 		WORD sections_count;
 		WORD imp_key;
 		WORD hdr_size;
-		WORD unk_3;
+		WORD unk_2;
 		DWORD module_size;
 		DWORD entry_point;
 		t_XS_data_dir data_dir[XS_DATA_DIR_COUNT];

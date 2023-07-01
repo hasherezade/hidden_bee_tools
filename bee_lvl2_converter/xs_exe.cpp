@@ -139,9 +139,9 @@ void print_format(t_XS_format *bee_hdr)
 		<<  "Magic:         " << bee_hdr->magic
 		<< "\nEP:            " << bee_hdr->entry_point
 		<< "\nModuleSize:    " << bee_hdr->module_size 
-		<< "\nImp Checksums: " << bee_hdr->imp_checksums_rva
+		<< "\nUnk1           " << bee_hdr->unk_1
 		<< "\nImp Key:       " << bee_hdr->imp_key
-		<< "\nUnk3           " << bee_hdr->unk_3
+		<< "\nUnk2           " << bee_hdr->unk_2
 		<< "\n" << std::endl;
 }
 
@@ -190,9 +190,9 @@ namespace xs_exe {
 	class ChecksumFiller : public peconv::ImportThunksCallback
 	{
 	public:
-		ChecksumFiller(BYTE* _modulePtr, size_t _moduleSize, DWORD _imp_key, DWORD _checks_offset, t_XS_data_dir &_imps)
+		ChecksumFiller(BYTE* _modulePtr, size_t _moduleSize, DWORD _imp_key)
 			: ImportThunksCallback(_modulePtr, _moduleSize),
-			imp_key(_imp_key), checks_offset(_checks_offset), imps(_imps)
+			imp_key(_imp_key)
 		{
 		}
 
@@ -248,8 +248,6 @@ namespace xs_exe {
 			return true;
 		}
 		DWORD imp_key;
-		DWORD checks_offset;
-		t_XS_data_dir& imps;
 	};
 };
 
@@ -329,7 +327,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 	memcpy(out_buf + imports_raw, rec_imports, imp_area_size);
 	delete[]rec_imports; rec_imports = nullptr;
 
-	xs_exe::ChecksumFiller collector(out_buf, out_size, bee_hdr->imp_key, bee_hdr->imp_checksums_rva, bee_hdr->data_dir[XS_IMPORTS]);
+	xs_exe::ChecksumFiller collector(out_buf, out_size, bee_hdr->imp_key);
 	if (!peconv::process_import_table(out_buf, out_size, &collector)) {
 		std::cerr << "Failed to process the import table\n";
 	}
