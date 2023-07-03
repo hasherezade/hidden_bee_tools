@@ -9,7 +9,6 @@
 #include "util.h"
 using namespace xs_exe;
 
-
 namespace xs_exe {
 	DWORD calc_sec_alignment(t_XS_section* section, size_t sections_count, bool is_virtual = true)
 	{
@@ -49,7 +48,6 @@ bool fill_nt_hdrs(t_XS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 	nt_hdr->SectionAlignment = calc_sec_alignment(&bee_hdr->sections, bee_hdr->sections_count, true);
 	nt_hdr->FileAlignment = nt_hdr->SectionAlignment;
 
-	nt_hdr->ImageBase = 0;
 	nt_hdr->AddressOfEntryPoint = bee_hdr->entry_point;
 
 	nt_hdr->SizeOfHeaders = kMinAlign;// bee_hdr->hdr_size;
@@ -81,6 +79,46 @@ bool fill_sections(t_XS_section *rs_section, IMAGE_SECTION_HEADER *sec_hdr, size
 	return true;
 }
 
+bool fill_relocations_table(t_XS_format& bee_hdr, BYTE* mapped_xs, DWORD img_base)
+{
+	if (!mapped_xs) return false;
+
+	DWORD dir_rva = bee_hdr.data_dir[XS_RELOCATIONS].dir_va;
+	DWORD dir_size = bee_hdr.data_dir[XS_RELOCATIONS].dir_size;
+
+	xs_relocs* reloc_ptr = (xs_relocs*)((ULONG_PTR)mapped_xs + dir_rva);
+	std::cout << "parsing relocs, rva: " << std::hex << dir_rva << " size: " << dir_size << "\n";
+
+	DWORD parsed_entries = 0;
+	xs_reloc_entry* list = (xs_reloc_entry*)((ULONG_PTR)&reloc_ptr->blocks[reloc_ptr->count]);
+
+	WORD field_rva = 0;
+	for (DWORD i = 0; i < reloc_ptr->count; i++) {
+		
+		xs_relocs_block* block = &reloc_ptr->blocks[i];
+		std::cout << "#"<< i << std::hex << " : page_rva: " << block->page_rva << " count: " << block->entries_count << "\n";
+
+		xs_reloc_entry* element = list;
+		for (DWORD k = 0; k < block->entries_count; element++) {
+			
+			for (size_t indx = 0; indx < 2 && k < block->entries_count; indx++, k++) {
+				if (indx == 0) {
+					field_rva = (16 * element->field1_hi | (element->mid >> 4));
+				}
+				else {
+					BYTE* _field_rva = (BYTE*)((ULONG_PTR)&field_rva);
+					_field_rva[1] = element->mid & 0x0F;
+					_field_rva[0] = element->field2_low;
+				}
+				DWORD* field = (DWORD*)((ULONG_PTR)mapped_xs + block->page_rva + field_rva);
+				(*field) += img_base;
+				std::cout << k << " : " << indx << " Field to reloc: " << field_rva <<  " Relocated: " << (*field) << " \n";
+			}
+			
+		}
+	}
+}
+
 size_t count_imports(t_XS_import *rs_import)
 {
 	for (size_t i = 0; true; i++) {
@@ -101,8 +139,7 @@ void __cdecl decode_name(BYTE* library_name, WORD lib_decode_key)
 	{
 		do
 		{
-			//std::cout << "Val: " << (*_val_ptr) << "\n";
-			*_val_ptr = lib_decode_key ^ (*_val_ptr);// [module - (_DWORD)library_name] ;
+			*_val_ptr = lib_decode_key ^ (*_val_ptr);
 			if ((*_val_ptr) == 0) break;
 
 			flag = lib_decode_key;
@@ -289,6 +326,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 	file_hdrs->Machine = (bee_hdr->nt_magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) ? IMAGE_FILE_MACHINE_AMD64 : IMAGE_FILE_MACHINE_I386; // 32 bit only
 	file_hdrs->NumberOfSections = bee_hdr->sections_count;
 
+	DWORD img_base = 0x100000;
 	BYTE *opt_hdr = (BYTE*)((ULONG_PTR)file_hdrs + sizeof(IMAGE_FILE_HEADER));
 	size_t opt_hdr_size = 0;
 	if (file_hdrs->Machine == IMAGE_FILE_MACHINE_AMD64) {
@@ -296,6 +334,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 		IMAGE_OPTIONAL_HEADER64* opt_hdr64 = (IMAGE_OPTIONAL_HEADER64*)opt_hdr;
 		opt_hdr64->Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC;
 		opt_hdr64->NumberOfRvaAndSizes = 16;
+		opt_hdr64->ImageBase = img_base;
 		fill_nt_hdrs(bee_hdr, opt_hdr64);
 	}
 	else {
@@ -303,6 +342,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 		IMAGE_OPTIONAL_HEADER32* opt_hdr32 = (IMAGE_OPTIONAL_HEADER32*)opt_hdr;
 		opt_hdr32->Magic = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
 		opt_hdr32->NumberOfRvaAndSizes = 16;
+		opt_hdr32->ImageBase = img_base;
 		fill_nt_hdrs(bee_hdr, opt_hdr32);
 	}
 
@@ -336,6 +376,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 	if (!peconv::process_import_table(out_buf, out_size, &collector)) {
 		std::cerr << "Failed to process the import table\n";
 	}
+	fill_relocations_table(*bee_hdr, out_buf, img_base);
 	std::cout << "Finished...\n";
 	mod.pBlobData = out_buf;
 	mod.cbSize = out_size;

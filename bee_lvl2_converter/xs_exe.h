@@ -46,5 +46,23 @@ namespace xs_exe {
 		t_XS_section sections;
 	} t_XS_format;
 
+	struct xs_relocs_block
+	{
+		DWORD page_rva;
+		DWORD entries_count;
+	};
+
+	struct xs_relocs
+	{
+		DWORD count;
+		xs_relocs_block blocks[1];
+	};
+
+	struct xs_reloc_entry {
+		BYTE field1_hi;
+		BYTE mid;
+		BYTE field2_low;
+	};
+
 	BLOB unscramble_pe(BYTE *buf, size_t buf_size);
 };
