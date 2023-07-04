@@ -90,18 +90,29 @@ bool fill_relocations_table(t_XS_format& bee_hdr, BYTE* mapped_xs, DWORD img_bas
 	std::cout << "parsing relocs, rva: " << std::hex << dir_rva << " size: " << dir_size << "\n";
 
 	DWORD parsed_entries = 0;
-	xs_reloc_entry* list = (xs_reloc_entry*)((ULONG_PTR)&reloc_ptr->blocks[reloc_ptr->count]);
+	xs_reloc_entry* element = (xs_reloc_entry*)((ULONG_PTR)&reloc_ptr->blocks[reloc_ptr->count]);
 
+	WORD saved_field = 0;
 	WORD field_rva = 0;
 	for (DWORD i = 0; i < reloc_ptr->count; i++) {
 		
 		xs_relocs_block* block = &reloc_ptr->blocks[i];
 		std::cout << "#"<< i << std::hex << " : page_rva: " << block->page_rva << " count: " << block->entries_count << "\n";
 
-		xs_reloc_entry* element = list;
-		for (DWORD k = 0; k < block->entries_count; element++) {
+		for (DWORD k = 0; k < block->entries_count; ) {
 			
-			for (size_t indx = 0; indx < 2 && k < block->entries_count; indx++, k++) {
+			if (saved_field) {
+				field_rva = saved_field;
+				saved_field = 0;
+
+				DWORD* field = (DWORD*)((ULONG_PTR)mapped_xs + block->page_rva + field_rva);
+				(*field) += img_base;
+				std::cout << k << " : saved:" << " Field to reloc: " << field_rva << " Relocated: " << (*field) << " \n";
+				k++;
+				continue;
+			}
+
+			for (size_t indx = 0; indx < 2; indx++, k++) {
 				if (indx == 0) {
 					field_rva = (16 * element->field1_hi | (element->mid >> 4));
 				}
@@ -110,11 +121,16 @@ bool fill_relocations_table(t_XS_format& bee_hdr, BYTE* mapped_xs, DWORD img_bas
 					_field_rva[1] = element->mid & 0x0F;
 					_field_rva[0] = element->field2_low;
 				}
+				if (k >= block->entries_count) {
+					saved_field = field_rva;
+					break;
+				}
 				DWORD* field = (DWORD*)((ULONG_PTR)mapped_xs + block->page_rva + field_rva);
 				(*field) += img_base;
 				std::cout << k << " : " << indx << " Field to reloc: " << field_rva <<  " Relocated: " << (*field) << " \n";
 			}
-			
+
+			element++;
 		}
 	}
 }
