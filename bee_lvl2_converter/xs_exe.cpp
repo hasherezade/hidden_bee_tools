@@ -149,7 +149,9 @@ bool fill_relocations_table(t_XS_format& bee_hdr, BYTE* mapped_xs, DWORD img_bas
 
 	DWORD dir_rva = bee_hdr.data_dir[XS_RELOCATIONS].dir_va;
 	DWORD dir_size = bee_hdr.data_dir[XS_RELOCATIONS].dir_size;
-
+	if (dir_rva == 0 || dir_size == 0) {
+		return true; // nothing to apply
+	}
 	xs_relocs* reloc_ptr = (xs_relocs*)((ULONG_PTR)mapped_xs + dir_rva);
 	std::cout << "relocs: rva: " << std::hex << dir_rva << " size: " << dir_size << "\n";
 
