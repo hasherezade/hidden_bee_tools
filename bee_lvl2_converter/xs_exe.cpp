@@ -79,15 +79,79 @@ bool fill_sections(t_XS_section *rs_section, IMAGE_SECTION_HEADER *sec_hdr, size
 	return true;
 }
 
+
+template <typename T_IMAGE_OPTIONAL_HEADER>
+bool build_relocs_table(BYTE* mapped_xs, std::map<DWORD, std::vector<DWORD>> &relocs_list, T_IMAGE_OPTIONAL_HEADER* nt_hdr)
+{
+	typedef struct _BASE_RELOCATION_ENTRY {
+		WORD Offset : 12;
+		WORD Type : 4;
+	} BASE_RELOCATION_ENTRY;
+
+	WORD RELOC_32BIT_FIELD = 3;
+	WORD RELOC_64BIT_FIELD = 0xA;
+	WORD RELOC_FIELD = (nt_hdr->Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) ? RELOC_64BIT_FIELD : RELOC_32BIT_FIELD;
+
+	size_t table_size = sizeof(IMAGE_BASE_RELOCATION) * relocs_list.size();
+
+	for (auto itr = relocs_list.begin(); itr != relocs_list.end(); ++itr) {
+		table_size += sizeof(BASE_RELOCATION_ENTRY) * itr->second.size();
+	}
+
+	BYTE* table = new BYTE[table_size];
+	::memset(table, 0, table_size);
+
+	BYTE* table_ptr = table;
+
+	for (auto itr = relocs_list.begin(); itr != relocs_list.end(); ++itr) {
+
+		IMAGE_BASE_RELOCATION* record = (IMAGE_BASE_RELOCATION*)table_ptr;
+		record->VirtualAddress = itr->first;
+		record->SizeOfBlock = sizeof(BASE_RELOCATION_ENTRY) * itr->second.size() + sizeof(IMAGE_BASE_RELOCATION);
+		table_ptr += sizeof(IMAGE_BASE_RELOCATION);
+
+		for (auto itr2 = itr->second.begin(); itr2 != itr->second.end(); ++itr2) {
+			BASE_RELOCATION_ENTRY* entry = (BASE_RELOCATION_ENTRY*)table_ptr;
+			entry->Offset = *itr2;
+			entry->Type = RELOC_FIELD;
+			table_ptr += sizeof(BASE_RELOCATION_ENTRY);
+		}
+	}
+	DWORD rva = nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size = table_size;
+
+	::memcpy(mapped_xs + rva, table, table_size);
+	return true;
+}
+
+bool build_relocs_table(BYTE* mapped_xs, std::map<DWORD, std::vector<DWORD>>& relocs_list)
+{
+	bool is_ok = false;
+	IMAGE_DOS_HEADER* dos_hdr = (IMAGE_DOS_HEADER*)mapped_xs;
+	IMAGE_FILE_HEADER* file_hdrs = (IMAGE_FILE_HEADER*)((ULONG_PTR)mapped_xs + dos_hdr->e_lfanew + sizeof(IMAGE_NT_SIGNATURE));
+	BYTE* opt_hdr = (BYTE*)((ULONG_PTR)file_hdrs + sizeof(IMAGE_FILE_HEADER));
+	if (file_hdrs->Machine == IMAGE_FILE_MACHINE_AMD64) {
+		IMAGE_OPTIONAL_HEADER64* opt_hdr64 = (IMAGE_OPTIONAL_HEADER64*)opt_hdr;
+		is_ok = build_relocs_table(mapped_xs, relocs_list, opt_hdr64);
+	}
+	else {
+		IMAGE_OPTIONAL_HEADER32* opt_hdr32 = (IMAGE_OPTIONAL_HEADER32*)opt_hdr;
+		is_ok = build_relocs_table(mapped_xs, relocs_list, opt_hdr32);
+	}
+	return is_ok;
+}
+
 bool fill_relocations_table(t_XS_format& bee_hdr, BYTE* mapped_xs, DWORD img_base)
 {
 	if (!mapped_xs) return false;
+
+	std::map<DWORD, std::vector<DWORD>> relocs_list;
 
 	DWORD dir_rva = bee_hdr.data_dir[XS_RELOCATIONS].dir_va;
 	DWORD dir_size = bee_hdr.data_dir[XS_RELOCATIONS].dir_size;
 
 	xs_relocs* reloc_ptr = (xs_relocs*)((ULONG_PTR)mapped_xs + dir_rva);
-	std::cout << "parsing relocs, rva: " << std::hex << dir_rva << " size: " << dir_size << "\n";
+	std::cout << "relocs: rva: " << std::hex << dir_rva << " size: " << dir_size << "\n";
 
 	DWORD parsed_entries = 0;
 	xs_reloc_entry* element = (xs_reloc_entry*)((ULONG_PTR)&reloc_ptr->blocks[reloc_ptr->count]);
@@ -105,9 +169,12 @@ bool fill_relocations_table(t_XS_format& bee_hdr, BYTE* mapped_xs, DWORD img_bas
 				field_rva = saved_field;
 				saved_field = 0;
 
+				relocs_list[block->page_rva].push_back(field_rva);
 				DWORD* field = (DWORD*)((ULONG_PTR)mapped_xs + block->page_rva + field_rva);
 				(*field) += img_base;
+#ifdef _DEBUG
 				std::cout << k << " : saved:" << " Field to reloc: " << field_rva << " Relocated: " << (*field) << " \n";
+#endif
 				k++;
 				continue;
 			}
@@ -125,14 +192,18 @@ bool fill_relocations_table(t_XS_format& bee_hdr, BYTE* mapped_xs, DWORD img_bas
 					saved_field = field_rva;
 					break;
 				}
+				relocs_list[block->page_rva].push_back(field_rva);
 				DWORD* field = (DWORD*)((ULONG_PTR)mapped_xs + block->page_rva + field_rva);
 				(*field) += img_base;
+#ifdef _DEBUG
 				std::cout << k << " : " << indx << " Field to reloc: " << field_rva <<  " Relocated: " << (*field) << " \n";
+#endif
 			}
 
 			element++;
 		}
 	}
+	return build_relocs_table(mapped_xs, relocs_list);
 }
 
 size_t count_imports(t_XS_import *rs_import)
@@ -158,7 +229,7 @@ void __cdecl decode_name(BYTE* library_name, WORD lib_decode_key)
 			*_val_ptr = lib_decode_key ^ (*_val_ptr);
 			if ((*_val_ptr) == 0) break;
 
-			flag = lib_decode_key;
+			flag = (char)lib_decode_key;
 			lib_decode_key >>= 1;
 			if ((flag & 1) != 0)
 				lib_decode_key ^= 0xB400u;
@@ -181,8 +252,9 @@ bool fill_imports(BYTE* mapped_xs, t_XS_import *rs_import, IMAGE_IMPORT_DESCRIPT
 			<< "original_first_thunk: " << std::hex << rs_import[i].original_first_thunk << "\t"
 			<< "dll_name_rva: " << rs_import[i].dll_name_rva << "\t"
 			<< "Unk: " << rs_import[i].obf_dll_len << "\n";
-
+#ifdef _DEBUG
 		std::cout << "Decoding name at: " << std::hex << rs_import[i].dll_name_rva << "\n";
+#endif
 		BYTE* lib_name = (BYTE*)((ULONG_PTR)mapped_xs + rs_import[i].dll_name_rva);
 		decode_name(lib_name, imp_key);
 	}
