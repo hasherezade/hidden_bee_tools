@@ -287,10 +287,11 @@ BLOB rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 
 	ChecksumFiller collector(out_buf, out_size);
 	peconv::process_import_table(out_buf, out_size, &collector);
-
-	DWORD img_base = 0x100000;
-	if (peconv::relocate_module(out_buf, out_size, img_base, 0)) {
-		peconv::update_image_base(out_buf, img_base);
+	if (!isMapped) {
+		DWORD img_base = 0x100000;
+		if (peconv::relocate_module(out_buf, out_size, img_base, 0)) {
+			peconv::update_image_base(out_buf, img_base);
+		}
 	}
 	std::cout << "Finished...\n";
 	mod.pBlobData = out_buf;

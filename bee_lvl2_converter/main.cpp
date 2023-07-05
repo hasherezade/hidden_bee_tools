@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 	peconv::t_pe_dump_mode dump_mode = peconv::PE_DUMP_AUTO;
 	std::string out_path = std::string(argv[1]) + ".pe";
 	ULONGLONG module_base = 0;
-	if (argc > 4) {
+	if (argc >= 4) {
 		if (sscanf(argv[3], "%llX", &module_base) == 0) {
 			sscanf(argv[3], "%#llX", &module_base);
 		}

@@ -418,7 +418,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	file_hdrs->Machine = (bee_hdr->nt_magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) ? IMAGE_FILE_MACHINE_AMD64 : IMAGE_FILE_MACHINE_I386; // 32 bit only
 	file_hdrs->NumberOfSections = bee_hdr->sections_count;
 
-	DWORD img_base = 0x100000;
+	DWORD img_base = isMapped ? 0 : 0x100000;
 	BYTE *opt_hdr = (BYTE*)((ULONG_PTR)file_hdrs + sizeof(IMAGE_FILE_HEADER));
 	size_t opt_hdr_size = 0;
 	if (file_hdrs->Machine == IMAGE_FILE_MACHINE_AMD64) {
@@ -466,6 +466,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	if (!peconv::process_import_table(out_buf, out_size, &collector)) {
 		std::cerr << "Failed to process the import table\n";
 	}
+	
 	fill_relocations_table(*bee_hdr, out_buf, img_base);
 	std::cout << "Finished...\n";
 	mod.pBlobData = out_buf;
