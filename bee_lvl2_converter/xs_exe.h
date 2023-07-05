@@ -64,5 +64,5 @@ namespace xs_exe {
 		BYTE field2_low;
 	};
 
-	BLOB unscramble_pe(BYTE *buf, size_t buf_size);
+	BLOB unscramble_pe(BYTE *buf, size_t buf_size, bool isMapped);
 };

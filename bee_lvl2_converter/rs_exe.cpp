@@ -122,13 +122,15 @@ void print_sections(t_RS_section *rs_section, size_t sections_count)
 	}
 }
 
-void copy_sections(t_RS_format* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out_size)
+void copy_sections(t_RS_format* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out_size, bool isMapped)
 {
 	t_RS_section* rs_section = &bee_hdr->sections;
 	for (size_t i = 0; i < bee_hdr->sections_count; i++) {
-		::memcpy((BYTE*)((ULONG_PTR)out_buf + rs_section[i].va), (BYTE*)((ULONG_PTR)in_buf + rs_section[i].raw_addr), rs_section[i].size);
+		const DWORD raw = isMapped ? rs_section[i].va : rs_section[i].raw_addr;
+		::memcpy((BYTE*)((ULONG_PTR)out_buf + rs_section[i].va), (BYTE*)((ULONG_PTR)in_buf + raw), rs_section[i].size);
 	}
 }
+
 namespace rs_exe {
 	DWORD calc_checksum(BYTE* a1)
 	{
@@ -210,7 +212,7 @@ protected:
 	}
 };
 
-BLOB rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
+BLOB rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 {
 	BLOB mod = { 0 };
 	t_RS_format *bee_hdr = (t_RS_format*)in_buf;
@@ -265,7 +267,7 @@ BLOB rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 	::memcpy(out_buf, rec_hdr, rec_size);
 	delete[]rec_hdr; rec_hdr = nullptr;
 
-	copy_sections(bee_hdr, in_buf, out_buf, out_size);
+	copy_sections(bee_hdr, in_buf, out_buf, out_size, isMapped);
 
 	//WARNING: if the file alignment differs from virtual alignmnent it needs to be converted!
 	DWORD imports_raw = bee_hdr->data_dir[RS_IMPORTS].dir_va;

@@ -10,6 +10,7 @@ namespace hs_exe {
 
 	enum data_dir_id {
 		HS_IMPORTS = 0,
+		HS_EXCEPTIONS,
 		HS_RELOCATIONS = 2
 	};
 
@@ -45,5 +46,5 @@ namespace hs_exe {
 		t_HS_section sections;
 	} t_HS_format;
 
-	BLOB unscramble_pe(BYTE *buf, size_t buf_size);
+	BLOB unscramble_pe(BYTE *buf, size_t buf_size, bool isMapped);
 };

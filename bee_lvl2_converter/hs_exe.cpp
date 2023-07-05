@@ -57,13 +57,17 @@ bool fill_nt_hdrs(t_HS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 	nt_hdr->ImageBase = make_img_base(bee_hdr);
 	nt_hdr->AddressOfEntryPoint = bee_hdr->entry_point;
 
-	nt_hdr->SizeOfHeaders = kMinAlign;// bee_hdr->hdr_size;
+	nt_hdr->SizeOfHeaders = kMinAlign;
 	nt_hdr->SizeOfImage = bee_hdr->module_size;
 
 	nt_hdr->Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI;
+	nt_hdr->NumberOfRvaAndSizes = 16;
 
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = bee_hdr->data_dir[HS_IMPORTS].dir_va;
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = bee_hdr->data_dir[HS_IMPORTS].dir_size;
+
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress = bee_hdr->data_dir[HS_EXCEPTIONS].dir_va;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].Size = bee_hdr->data_dir[HS_EXCEPTIONS].dir_size;
 
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress = bee_hdr->data_dir[HS_RELOCATIONS].dir_va;
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size = bee_hdr->data_dir[HS_RELOCATIONS].dir_size;
@@ -140,9 +144,8 @@ void copy_sections(t_HS_format* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out
 	}
 }
 
-BLOB hs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
+BLOB hs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 {
-	bool isMapped = true;
 	BLOB mod = { 0 };
 	t_HS_format *bee_hdr = (t_HS_format*)in_buf;
 	size_t out_size = buf_size > bee_hdr->module_size ? buf_size : bee_hdr->module_size;

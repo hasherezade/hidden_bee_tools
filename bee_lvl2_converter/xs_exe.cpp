@@ -297,13 +297,15 @@ void print_data_dirs(t_XS_data_dir* ddir, size_t sections_count)
 	}
 }
 
-void copy_sections(t_XS_format* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out_size)
+void copy_sections(t_XS_format* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out_size, bool isMapped)
 {
 	t_XS_section* rs_section = &bee_hdr->sections;
 	for (size_t i = 0; i < bee_hdr->sections_count; i++) {
-		::memcpy((BYTE*)((ULONG_PTR)out_buf + rs_section[i].va), (BYTE*)((ULONG_PTR)in_buf + rs_section[i].raw_addr), rs_section[i].size);
+		const DWORD raw = isMapped ? rs_section[i].va : rs_section[i].raw_addr;
+		::memcpy((BYTE*)((ULONG_PTR)out_buf + rs_section[i].va), (BYTE*)((ULONG_PTR)in_buf + raw), rs_section[i].size);
 	}
 }
+
 namespace xs_exe {
 
 	int calc_checksum(BYTE* name_ptr, int imp_key)
@@ -383,7 +385,7 @@ namespace xs_exe {
 	};
 };
 
-BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
+BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 {
 	BLOB mod = { 0 };
 	t_XS_format *bee_hdr = (t_XS_format*)in_buf;
@@ -439,7 +441,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 
 	fill_sections(&bee_hdr->sections, sec_hdr, bee_hdr->sections_count);
 
-	copy_sections(bee_hdr, in_buf, out_buf, out_size);
+	copy_sections(bee_hdr, in_buf, out_buf, out_size, isMapped);
 
 	::memcpy(out_buf, rec_hdr, rec_size);
 	delete[]rec_hdr; rec_hdr = nullptr;

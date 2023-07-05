@@ -50,7 +50,7 @@ bool unscramble_pe(BYTE *buf, size_t buf_size)
 	return true;
 }
 
-BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
+BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size, bool is_mapped)
 {
 	BLOB mod = { 0 };
 	BEE_TYPE type = check_type(buf, buf_size);
@@ -61,7 +61,7 @@ BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
 
 	mod.pBlobData = buf;
 	mod.cbSize = buf_size;
-
+	
 	std::cout << "Type: " << type << std::endl;
 	switch (type) {
 	case BEE_SCRAMBLED2:
@@ -74,13 +74,13 @@ BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size)
 		ns_exe::unscramble_pe(buf, buf_size);
 		break;
 	case RHADAM_RS_FORMAT:
-		mod = rs_exe::unscramble_pe(buf, buf_size);
+		mod = rs_exe::unscramble_pe(buf, buf_size, is_mapped);
 		break;
 	case RHADAM_HS_FORMAT:
-		mod = hs_exe::unscramble_pe(buf, buf_size);
+		mod = hs_exe::unscramble_pe(buf, buf_size, is_mapped);
 		break;
 	case RHADAM_XS_FORMAT:
-		mod = xs_exe::unscramble_pe(buf, buf_size);
+		mod = xs_exe::unscramble_pe(buf, buf_size, is_mapped);
 		break;
 	}
 

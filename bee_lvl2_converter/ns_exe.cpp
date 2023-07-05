@@ -37,6 +37,7 @@ bool fill_nt_hdrs(t_NS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 	nt_hdr->SizeOfImage = bee_hdr->module_size;
 
 	nt_hdr->Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI;
+	nt_hdr->NumberOfRvaAndSizes = 16;
 
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = bee_hdr->data_dir[NS_IMPORTS].dir_va;
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = bee_hdr->data_dir[NS_IMPORTS].dir_size;
