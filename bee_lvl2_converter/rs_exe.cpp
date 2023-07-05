@@ -52,17 +52,20 @@ bool fill_nt_hdrs(t_RS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 	nt_hdr->ImageBase = 0;
 	nt_hdr->AddressOfEntryPoint = bee_hdr->entry_point;
 
-	nt_hdr->SizeOfHeaders = kMinAlign;// bee_hdr->hdr_size;
+	nt_hdr->SizeOfHeaders = kMinAlign;
 	nt_hdr->SizeOfImage = bee_hdr->module_size;
 
 	nt_hdr->Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI;
+	nt_hdr->NumberOfRvaAndSizes = 16;
 
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = bee_hdr->data_dir[RS_IMPORTS].dir_va;
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = bee_hdr->data_dir[RS_IMPORTS].dir_size;
 
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress = bee_hdr->data_dir[RS_EXCEPTIONS].dir_va;
+	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].Size = bee_hdr->data_dir[RS_EXCEPTIONS].dir_size;
+
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress = bee_hdr->data_dir[RS_RELOCATIONS].dir_va;
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size = bee_hdr->data_dir[RS_RELOCATIONS].dir_size;
-
 	return true;
 }
 
@@ -129,11 +132,11 @@ void copy_sections(t_RS_format* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out
 namespace rs_exe {
 	DWORD calc_checksum(BYTE* a1)
 	{
-		BYTE* ptr; // edx
-		unsigned int result; // eax
-		char i; // cl
-		int v4; // esi
-		int v5; // eax
+		BYTE* ptr; 
+		unsigned int result;
+		char i;
+		int v4;
+		int v5;
 
 		ptr = a1;
 		result = 0;
@@ -282,6 +285,11 @@ BLOB rs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 
 	ChecksumFiller collector(out_buf, out_size);
 	peconv::process_import_table(out_buf, out_size, &collector);
+
+	DWORD img_base = 0x100000;
+	if (peconv::relocate_module(out_buf, out_size, img_base, 0)) {
+		peconv::update_image_base(out_buf, img_base);
+	}
 	std::cout << "Finished...\n";
 	mod.pBlobData = out_buf;
 	mod.cbSize = out_size;

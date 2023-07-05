@@ -10,6 +10,7 @@ namespace rs_exe {
 
 	enum data_dir_id {
 		RS_IMPORTS = 0,
+		RS_EXCEPTIONS,
 		RS_RELOCATIONS = 2
 	};
 

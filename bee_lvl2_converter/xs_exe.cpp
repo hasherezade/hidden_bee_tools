@@ -54,6 +54,7 @@ bool fill_nt_hdrs(t_XS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 	nt_hdr->SizeOfImage = bee_hdr->module_size;
 
 	nt_hdr->Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI;
+	nt_hdr->NumberOfRvaAndSizes = 16;
 
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = bee_hdr->data_dir[XS_IMPORTS].dir_va;
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = bee_hdr->data_dir[XS_IMPORTS].dir_size;
@@ -63,7 +64,6 @@ bool fill_nt_hdrs(t_XS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress = bee_hdr->data_dir[XS_RELOCATIONS].dir_va;
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC].Size = bee_hdr->data_dir[XS_RELOCATIONS].dir_size;
-
 	return true;
 }
 
@@ -423,7 +423,6 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER64);
 		IMAGE_OPTIONAL_HEADER64* opt_hdr64 = (IMAGE_OPTIONAL_HEADER64*)opt_hdr;
 		opt_hdr64->Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC;
-		opt_hdr64->NumberOfRvaAndSizes = 16;
 		opt_hdr64->ImageBase = img_base;
 		fill_nt_hdrs(bee_hdr, opt_hdr64);
 	}
@@ -431,7 +430,6 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size)
 		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER32);
 		IMAGE_OPTIONAL_HEADER32* opt_hdr32 = (IMAGE_OPTIONAL_HEADER32*)opt_hdr;
 		opt_hdr32->Magic = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
-		opt_hdr32->NumberOfRvaAndSizes = 16;
 		opt_hdr32->ImageBase = img_base;
 		fill_nt_hdrs(bee_hdr, opt_hdr32);
 	}
