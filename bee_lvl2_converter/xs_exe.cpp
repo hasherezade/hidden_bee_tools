@@ -50,7 +50,7 @@ bool fill_nt_hdrs(t_XS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 
 	nt_hdr->AddressOfEntryPoint = bee_hdr->entry_point;
 
-	nt_hdr->SizeOfHeaders = kMinAlign;// bee_hdr->hdr_size;
+	nt_hdr->SizeOfHeaders = kMinAlign;
 	nt_hdr->SizeOfImage = bee_hdr->module_size;
 
 	nt_hdr->Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI;
@@ -70,10 +70,15 @@ bool fill_nt_hdrs(t_XS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 bool fill_sections(t_XS_section *rs_section, IMAGE_SECTION_HEADER *sec_hdr, size_t sections_count)
 {
 	for (size_t i = 0; i < sections_count; i++) {
+		size_t v_size = rs_section[i].size;
+		if ((sections_count > 1) && i < (sections_count - 1)) {
+			const size_t diff = rs_section[i + 1].va - rs_section[i].va;
+			v_size = (diff > v_size) ? diff : v_size;
+		}
 		sec_hdr[i].VirtualAddress = rs_section[i].va;
 		sec_hdr[i].PointerToRawData = rs_section[i].va;
 		sec_hdr[i].SizeOfRawData = rs_section[i].size;
-		sec_hdr[i].Misc.VirtualSize = rs_section[i].size;
+		sec_hdr[i].Misc.VirtualSize = v_size;
 		sec_hdr[i].Characteristics = 0xE0000000;
 	}
 	return true;
@@ -368,8 +373,7 @@ namespace xs_exe {
 
 
 			DWORD* checks_ptr = (DWORD*)(by_name->Name);
-			DWORD curr_checks = (*checks_ptr);// +checks_offset;
-			//std::cout << "Searching the checksum: " << curr_checks << " in: " << lib_name << "\n";
+			DWORD curr_checks = (*checks_ptr);
 			peconv::get_exported_names(lib, names);
 			for (auto itr = names.begin(); itr != names.end(); itr++) {
 				DWORD checks1 = xs_exe::calc_checksum((BYTE*)itr->c_str(), imp_key);
