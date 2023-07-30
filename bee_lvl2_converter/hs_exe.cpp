@@ -179,6 +179,7 @@ BLOB hs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	BYTE *opt_hdr = (BYTE*)((ULONG_PTR)file_hdrs + sizeof(IMAGE_FILE_HEADER));
 	size_t opt_hdr_size = 0;
 	if (bee_hdr->machine_id == IMAGE_FILE_MACHINE_AMD64) {
+		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE;
 		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER64);
 		IMAGE_OPTIONAL_HEADER64* opt_hdr64 = (IMAGE_OPTIONAL_HEADER64*)opt_hdr;
 		opt_hdr64->Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC;
@@ -186,6 +187,7 @@ BLOB hs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 
 	}
 	else {
+		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_32BIT_MACHINE;
 		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER32);
 		IMAGE_OPTIONAL_HEADER32* opt_hdr32 = (IMAGE_OPTIONAL_HEADER32*)opt_hdr;
 		opt_hdr32->Magic = IMAGE_NT_OPTIONAL_HDR32_MAGIC;

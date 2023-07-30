@@ -8,6 +8,7 @@
 int main(int argc, char *argv[])
 {
 	if (argc < 3) {
+		std::cout << "Converter for Hidden Bee & Rhadamanthys custom executble formats\n";
 		std::cout << "Args: <input bee module> <is_mapped?> <module base>" << std::endl;
 		system("pause");
 		return -1;

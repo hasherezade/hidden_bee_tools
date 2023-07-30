@@ -55,7 +55,7 @@ BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size, bool is_mapped)
 	BLOB mod = { 0 };
 	BEE_TYPE type = check_type(buf, buf_size);
 	if (type == BEE_NONE) {
-		std::cout << "Not a Hidden Bee module!\n";
+		std::cout << "Unrecognized module!\n";
 		return mod;
 	}
 
@@ -83,7 +83,5 @@ BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size, bool is_mapped)
 		mod = xs_exe::unscramble_pe(buf, buf_size, is_mapped);
 		break;
 	}
-
-	std::cout << "Returning unscrambled!\n";
 	return mod;
 }

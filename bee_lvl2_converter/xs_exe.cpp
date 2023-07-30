@@ -258,7 +258,8 @@ bool fill_imports(BYTE* mapped_xs, t_XS_import *rs_import, IMAGE_IMPORT_DESCRIPT
 			<< "first_thunk: " << std::hex << rs_import[i].first_thunk << "\t"
 			<< "original_first_thunk: " << std::hex << rs_import[i].original_first_thunk << "\t"
 			<< "dll_name_rva: " << rs_import[i].dll_name_rva << "\t"
-			<< "Unk: " << rs_import[i].obf_dll_len << "\n";
+			//<< "Unk: " << rs_import[i].obf_dll_len 
+			<< "\n";
 #ifdef _DEBUG
 		std::cout << "Decoding name at: " << std::hex << rs_import[i].dll_name_rva << "\n";
 #endif
@@ -426,6 +427,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	BYTE *opt_hdr = (BYTE*)((ULONG_PTR)file_hdrs + sizeof(IMAGE_FILE_HEADER));
 	size_t opt_hdr_size = 0;
 	if (file_hdrs->Machine == IMAGE_FILE_MACHINE_AMD64) {
+		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE;
 		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER64);
 		IMAGE_OPTIONAL_HEADER64* opt_hdr64 = (IMAGE_OPTIONAL_HEADER64*)opt_hdr;
 		opt_hdr64->Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC;
@@ -433,6 +435,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 		fill_nt_hdrs(bee_hdr, opt_hdr64);
 	}
 	else {
+		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_32BIT_MACHINE;
 		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER32);
 		IMAGE_OPTIONAL_HEADER32* opt_hdr32 = (IMAGE_OPTIONAL_HEADER32*)opt_hdr;
 		opt_hdr32->Magic = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
@@ -456,7 +459,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	t_XS_import *rs_import = (t_XS_import*)((ULONG_PTR)out_buf + imports_raw);
 	size_t dlls_count = count_imports(rs_import);
 
-	std::cout << "DLLs count: " << dlls_count << std::endl;
+	std::cout << "DLLs count: " << std::dec << dlls_count << std::endl;
 	const size_t imp_area_size = dlls_count * sizeof(IMAGE_IMPORT_DESCRIPTOR);
 
 	BYTE *rec_imports = new BYTE[imp_area_size];
