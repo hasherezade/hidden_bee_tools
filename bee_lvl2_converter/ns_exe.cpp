@@ -2,17 +2,9 @@
 #include <peconv.h>
 #include <iostream>
 
-using namespace ns_exe;
+#include "util.h"
 
-DWORD gcd(DWORD a, DWORD b)
-{
-	while (b != 0) {
-		DWORD t = b;
-		b = a % b;
-		a = t;
-	}
-	return a;
-}
+using namespace ns_exe;
 
 DWORD calc_sec_alignment(t_NS_section *ns_section, size_t sections_count, bool is_virtual=true)
 {
@@ -45,6 +37,7 @@ bool fill_nt_hdrs(t_NS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 	nt_hdr->SizeOfImage = bee_hdr->module_size;
 
 	nt_hdr->Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI;
+	nt_hdr->NumberOfRvaAndSizes = 16;
 
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = bee_hdr->data_dir[NS_IMPORTS].dir_va;
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = bee_hdr->data_dir[NS_IMPORTS].dir_size;
