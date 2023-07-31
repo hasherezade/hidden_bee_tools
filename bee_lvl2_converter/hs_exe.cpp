@@ -42,7 +42,7 @@ namespace hs_exe {
 
 	uint64_t make_img_base(t_HS_format* bee_hdr)
 	{
-		const uint64_t img_base = ((uint64_t)bee_hdr->module_base_hi) << (sizeof(DWORD) * 8) | bee_hdr->module_base_low;
+		const uint64_t img_base = ((uint64_t)bee_hdr->module_base_high) << (sizeof(DWORD) * 8) | bee_hdr->module_base_low;
 		return img_base;
 	}
 }

@@ -39,7 +39,7 @@ namespace hs_exe {
 		DWORD entry_point;
 		DWORD module_size;
 		DWORD unk1;
-		DWORD module_base_hi;
+		DWORD module_base_high;
 		DWORD module_base_low;
 		DWORD unk2;
 		t_HS_data_dir data_dir[HS_DATA_DIR_COUNT];
