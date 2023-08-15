@@ -15,8 +15,8 @@ namespace xs_exe {
 	};
 
 	typedef struct {
-		DWORD dir_size;
 		DWORD dir_va;
+		DWORD dir_size;
 	} t_XS_data_dir;
 
 	typedef struct {
@@ -27,21 +27,13 @@ namespace xs_exe {
 	} t_XS_section;
 
 	typedef struct {
-		DWORD dll_name_rva;
-		DWORD first_thunk;
-		DWORD original_first_thunk;
-		DWORD obf_dll_len;
-	} t_XS_import;
-
-	typedef struct {
 		WORD magic;
-		WORD nt_magic;
 		WORD sections_count;
-		WORD imp_key;
 		WORD hdr_size;
-		WORD unk_2;
+		WORD imp_key;
 		DWORD module_size;
 		DWORD entry_point;
+		WORD unk_2;
 		t_XS_data_dir data_dir[XS_DATA_DIR_COUNT];
 		t_XS_section sections;
 	} t_XS_format;
@@ -63,6 +55,14 @@ namespace xs_exe {
 		BYTE mid;
 		BYTE field2_low;
 	};
+
+	#pragma pack(1) 
+	typedef struct {
+		DWORD dll_name_rva;
+		DWORD first_thunk;
+		DWORD original_first_thunk;
+		WORD obf_dll_len;
+	} t_XS_import;
 
 	BLOB unscramble_pe(BYTE *buf, size_t buf_size, bool isMapped);
 };

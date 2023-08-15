@@ -248,6 +248,7 @@ void __cdecl decode_name(BYTE* library_name, WORD lib_decode_key)
 
 bool fill_imports(BYTE* mapped_xs, t_XS_import *rs_import, IMAGE_IMPORT_DESCRIPTOR *imp_desc, size_t dlls_count, WORD imp_key)
 {
+	std::cout << "sizeof imp: " << sizeof(t_XS_import) << "\n";
 	for (size_t i = 0; i < dlls_count; i++) {
 		if (rs_import[i].first_thunk == 0) break;
 		imp_desc[i].FirstThunk = rs_import[i].first_thunk;
@@ -258,7 +259,7 @@ bool fill_imports(BYTE* mapped_xs, t_XS_import *rs_import, IMAGE_IMPORT_DESCRIPT
 			<< "first_thunk: " << std::hex << rs_import[i].first_thunk << "\t"
 			<< "original_first_thunk: " << std::hex << rs_import[i].original_first_thunk << "\t"
 			<< "dll_name_rva: " << rs_import[i].dll_name_rva << "\t"
-			//<< "Unk: " << rs_import[i].obf_dll_len 
+			<< "obf_len: " << rs_import[i].obf_dll_len 
 			<< "\n";
 #ifdef _DEBUG
 		std::cout << "Decoding name at: " << std::hex << rs_import[i].dll_name_rva << "\n";
@@ -277,7 +278,6 @@ void print_format(t_XS_format *bee_hdr)
 		<< "\nModuleSize:    " << bee_hdr->module_size 
 		<< "\nSec count:     " << bee_hdr->sections_count
 		<< "\nHdr Size:      " << bee_hdr->hdr_size
-		<< "\nNT magic:      " << bee_hdr->nt_magic
 		<< "\nImp Key:       " << bee_hdr->imp_key
 		<< "\nUnk2           " << bee_hdr->unk_2
 		<< "\n" << std::endl;
@@ -376,14 +376,20 @@ namespace xs_exe {
 			DWORD* checks_ptr = (DWORD*)(by_name->Name);
 			DWORD curr_checks = (*checks_ptr);
 			peconv::get_exported_names(lib, names);
+			bool is_found = false;
 			for (auto itr = names.begin(); itr != names.end(); itr++) {
 				DWORD checks1 = xs_exe::calc_checksum((BYTE*)itr->c_str(), imp_key);
 				if (checks1 == curr_checks) {
+					::memset(by_name->Name, 0, itr->length() + 1);
 					::memcpy(by_name->Name, itr->c_str(), itr->length());
+					is_found = true;
 					break;
 				}
 			}
 			FreeLibrary(lib);
+			if (!is_found) {
+				std::cerr << "Not found: " << lib_name << " Checksum: " << std::hex << curr_checks << "\n";
+			}
 			return true;
 		}
 		DWORD imp_key;
@@ -407,8 +413,10 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	print_data_dirs(bee_hdr->data_dir, 3);
 
 	size_t rec_size = PAGE_SIZE;
-	if (bee_hdr->hdr_size > rec_size) return mod;
-
+	if (bee_hdr->hdr_size > rec_size) {
+		std::cerr << "Invalid hdr size: " << bee_hdr->hdr_size << "\n";
+		return mod;
+	}
 	BYTE *rec_hdr = new BYTE[rec_size];
 	memset(rec_hdr, 0, rec_size);
 
@@ -420,7 +428,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	*pe_ptr = IMAGE_NT_SIGNATURE;
 
 	IMAGE_FILE_HEADER* file_hdrs = (IMAGE_FILE_HEADER*)((ULONG_PTR)rec_hdr + dos_hdr->e_lfanew + sizeof(IMAGE_NT_SIGNATURE));
-	file_hdrs->Machine = (bee_hdr->nt_magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) ? IMAGE_FILE_MACHINE_AMD64 : IMAGE_FILE_MACHINE_I386; // 32 bit only
+	file_hdrs->Machine = IMAGE_FILE_MACHINE_AMD64; // only 64 bit version?
 	file_hdrs->NumberOfSections = bee_hdr->sections_count;
 
 	DWORD img_base = isMapped ? 0 : 0x100000;
@@ -473,7 +481,6 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	if (!peconv::process_import_table(out_buf, out_size, &collector)) {
 		std::cerr << "Failed to process the import table\n";
 	}
-	
 	fill_relocations_table(*bee_hdr, out_buf, img_base);
 	std::cout << "Finished...\n";
 	mod.pBlobData = out_buf;
