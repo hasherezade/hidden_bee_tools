@@ -159,7 +159,6 @@ bool fill_relocations_table(t_XS_format& bee_hdr, BYTE* mapped_xs, DWORD img_bas
 	}
 	xs_relocs* reloc_ptr = (xs_relocs*)((ULONG_PTR)mapped_xs + dir_rva);
 	std::cout << "relocs: rva: " << std::hex << dir_rva << " size: " << dir_size << "\n";
-
 	DWORD parsed_entries = 0;
 	xs_reloc_entry* element = (xs_reloc_entry*)((ULONG_PTR)&reloc_ptr->blocks[reloc_ptr->count]);
 
@@ -168,8 +167,9 @@ bool fill_relocations_table(t_XS_format& bee_hdr, BYTE* mapped_xs, DWORD img_bas
 	for (DWORD i = 0; i < reloc_ptr->count; i++) {
 		
 		xs_relocs_block* block = &reloc_ptr->blocks[i];
+#ifdef _DEBUG
 		std::cout << "#"<< i << std::hex << " : page_rva: " << block->page_rva << " count: " << block->entries_count << "\n";
-
+#endif
 		for (DWORD k = 0; k < block->entries_count; ) {
 			
 			if (saved_field) {
@@ -279,7 +279,7 @@ void print_format(t_XS_format *bee_hdr)
 		<< "\nSec count:     " << bee_hdr->sections_count
 		<< "\nHdr Size:      " << bee_hdr->hdr_size
 		<< "\nImp Key:       " << bee_hdr->imp_key
-		<< "\nUnk2           " << bee_hdr->unk_2
+		<< "\nEP Alt         " << bee_hdr->entry_point_alt
 		<< "\n" << std::endl;
 }
 
@@ -290,7 +290,7 @@ void print_sections(t_XS_section *rs_section, size_t sections_count)
 		std::cout << "#" << i << ": VA: " << std::hex << rs_section[i].va << "\t"
 			<< "raw: " << std::hex << rs_section[i].raw_addr << "\t"
 			<< "Size: " << rs_section[i].size << "\t"
-			<< "Unk: " << rs_section[i].unk << "\n";
+			<< "Flags: " << rs_section[i].unk << "\n";
 	}
 }
 
@@ -330,9 +330,9 @@ namespace xs_exe {
 	class ChecksumFiller : public peconv::ImportThunksCallback
 	{
 	public:
-		ChecksumFiller(BYTE* _modulePtr, size_t _moduleSize, DWORD _imp_key)
+		ChecksumFiller(BYTE* _modulePtr, size_t _moduleSize, DWORD _imp_key, bool _is32b)
 			: ImportThunksCallback(_modulePtr, _moduleSize),
-			imp_key(_imp_key)
+			imp_key(_imp_key), is32b(_is32b)
 		{
 		}
 
@@ -392,11 +392,13 @@ namespace xs_exe {
 			}
 			return true;
 		}
+		
 		DWORD imp_key;
+		bool is32b;
 	};
 };
 
-BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
+BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped, bool is32bit)
 {
 	BLOB mod = { 0 };
 	t_XS_format *bee_hdr = (t_XS_format*)in_buf;
@@ -428,7 +430,12 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	*pe_ptr = IMAGE_NT_SIGNATURE;
 
 	IMAGE_FILE_HEADER* file_hdrs = (IMAGE_FILE_HEADER*)((ULONG_PTR)rec_hdr + dos_hdr->e_lfanew + sizeof(IMAGE_NT_SIGNATURE));
-	file_hdrs->Machine = IMAGE_FILE_MACHINE_AMD64; // only 64 bit version?
+	if (is32bit) {
+		file_hdrs->Machine = IMAGE_FILE_MACHINE_I386;
+	}
+	else {
+		file_hdrs->Machine = IMAGE_FILE_MACHINE_AMD64;
+	}
 	file_hdrs->NumberOfSections = bee_hdr->sections_count;
 
 	DWORD img_base = isMapped ? 0 : 0x100000;
@@ -477,12 +484,13 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	memcpy(out_buf + imports_raw, rec_imports, imp_area_size);
 	delete[]rec_imports; rec_imports = nullptr;
 
-	xs_exe::ChecksumFiller collector(out_buf, out_size, bee_hdr->imp_key);
+	xs_exe::ChecksumFiller collector(out_buf, out_size, bee_hdr->imp_key, is32bit);
 	if (!peconv::process_import_table(out_buf, out_size, &collector)) {
 		std::cerr << "Failed to process the import table\n";
 	}
 	fill_relocations_table(*bee_hdr, out_buf, img_base);
 	std::cout << "Finished...\n";
+
 	mod.pBlobData = out_buf;
 	mod.cbSize = out_size;
 	return mod;

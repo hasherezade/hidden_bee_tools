@@ -80,7 +80,7 @@ BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size, bool is_mapped)
 		mod = hs_exe::unscramble_pe(buf, buf_size, is_mapped);
 		break;
 	case RHADAM_XS_FORMAT:
-		mod = xs_exe::unscramble_pe(buf, buf_size, is_mapped);
+		mod = xs_exe::unscramble_pe(buf, buf_size, is_mapped, true);
 		break;
 	}
 	return mod;

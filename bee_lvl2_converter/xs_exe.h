@@ -33,7 +33,7 @@ namespace xs_exe {
 		WORD imp_key;
 		DWORD module_size;
 		DWORD entry_point;
-		WORD unk_2;
+		DWORD entry_point_alt;
 		t_XS_data_dir data_dir[XS_DATA_DIR_COUNT];
 		t_XS_section sections;
 	} t_XS_format;
@@ -64,5 +64,5 @@ namespace xs_exe {
 		WORD obf_dll_len;
 	} t_XS_import;
 
-	BLOB unscramble_pe(BYTE *buf, size_t buf_size, bool isMapped);
+	BLOB unscramble_pe(BYTE *buf, size_t buf_size, bool isMapped, bool is32bit);
 };
