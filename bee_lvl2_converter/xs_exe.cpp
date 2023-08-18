@@ -41,8 +41,8 @@ namespace xs_exe {
 	}
 }
 
-template <typename T_IMAGE_OPTIONAL_HEADER>
-bool fill_nt_hdrs(t_XS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
+template <typename XS_FORMAT, typename T_IMAGE_OPTIONAL_HEADER>
+bool fill_nt_hdrs(XS_FORMAT* bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 {
 	const int kMinAlign = get_first_section(&bee_hdr->sections, bee_hdr->sections_count, true);
 	nt_hdr->SectionAlignment = calc_sec_alignment(&bee_hdr->sections, bee_hdr->sections_count, true);
@@ -146,7 +146,8 @@ bool build_relocs_table(BYTE* mapped_xs, std::map<DWORD, std::vector<DWORD>>& re
 	return is_ok;
 }
 
-bool fill_relocations_table(t_XS_format& bee_hdr, BYTE* mapped_xs, DWORD img_base)
+template <typename XS_FORMAT>
+bool fill_relocations_table(XS_FORMAT& bee_hdr, BYTE* mapped_xs, DWORD img_base)
 {
 	if (!mapped_xs) return false;
 
@@ -213,10 +214,12 @@ bool fill_relocations_table(t_XS_format& bee_hdr, BYTE* mapped_xs, DWORD img_bas
 	return build_relocs_table(mapped_xs, relocs_list);
 }
 
-size_t count_imports(t_XS_import *rs_import)
+
+template <typename XS_IMPORT>
+size_t count_imports(XS_IMPORT *xs_import)
 {
 	for (size_t i = 0; true; i++) {
-		if (rs_import[i].first_thunk == 0) {
+		if (xs_import[i].first_thunk == 0) {
 			return i;
 		}
 	}
@@ -246,7 +249,8 @@ void __cdecl decode_name(BYTE* library_name, WORD lib_decode_key)
 	std::cout << "Name: " << library_name << "\n";
 }
 
-bool fill_imports(BYTE* mapped_xs, t_XS_import *rs_import, IMAGE_IMPORT_DESCRIPTOR *imp_desc, size_t dlls_count, WORD imp_key)
+template <typename XS_IMPORT>
+bool fill_imports(BYTE* mapped_xs, XS_IMPORT*rs_import, IMAGE_IMPORT_DESCRIPTOR *imp_desc, size_t dlls_count, WORD imp_key)
 {
 	for (size_t i = 0; i < dlls_count; i++) {
 		if (rs_import[i].first_thunk == 0) break;
@@ -269,18 +273,24 @@ bool fill_imports(BYTE* mapped_xs, t_XS_import *rs_import, IMAGE_IMPORT_DESCRIPT
 	return true;
 }
 
-void print_format(t_XS_format *bee_hdr)
+template <typename XS_FORMAT>
+void print_data_dirs(XS_FORMAT* ddir, size_t sections_count)
 {
-	std::cout << std::hex
-		<<  "Magic:         " << bee_hdr->magic
-		<< "\nEP:            " << bee_hdr->entry_point
-		<< "\nModuleSize:    " << bee_hdr->module_size 
-		<< "\nSec count:     " << bee_hdr->sections_count
-		<< "\nHdr Size:      " << bee_hdr->hdr_size
-		<< "\nNT magic:      " << bee_hdr->nt_magic
-		<< "\nImp Key:       " << bee_hdr->imp_key
-		<< "\nUnk2           " << bee_hdr->unk_2
-		<< "\n" << std::endl;
+	std::cout << "---DATA DIRS---\n";
+	for (size_t i = 0; i < sections_count; i++) {
+		std::cout << "#" << i << ": VA: " << std::hex << ddir[i].dir_va << "\t"
+			<< "Size: " << ddir[i].dir_size << "\n";
+	}
+}
+
+template <typename XS_FORMAT>
+void copy_sections(XS_FORMAT* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out_size, bool isMapped)
+{
+	t_XS_section* rs_section = &bee_hdr->sections;
+	for (size_t i = 0; i < bee_hdr->sections_count; i++) {
+		const DWORD raw = isMapped ? rs_section[i].va : rs_section[i].raw_addr;
+		::memcpy((BYTE*)((ULONG_PTR)out_buf + rs_section[i].va), (BYTE*)((ULONG_PTR)in_buf + raw), rs_section[i].size);
+	}
 }
 
 void print_sections(t_XS_section *rs_section, size_t sections_count)
@@ -290,29 +300,42 @@ void print_sections(t_XS_section *rs_section, size_t sections_count)
 		std::cout << "#" << i << ": VA: " << std::hex << rs_section[i].va << "\t"
 			<< "raw: " << std::hex << rs_section[i].raw_addr << "\t"
 			<< "Size: " << rs_section[i].size << "\t"
-			<< "Unk: " << rs_section[i].unk << "\n";
-	}
-}
-
-void print_data_dirs(t_XS_data_dir* ddir, size_t sections_count)
-{
-	std::cout << "---DATA DIRS---\n";
-	for (size_t i = 0; i < sections_count; i++) {
-		std::cout << "#" << i << ": VA: " << std::hex << ddir[i].dir_va << "\t"
-			<< "Size: " << ddir[i].dir_size << "\n";
-	}
-}
-
-void copy_sections(t_XS_format* bee_hdr, BYTE* in_buf, BYTE* out_buf, size_t out_size, bool isMapped)
-{
-	t_XS_section* rs_section = &bee_hdr->sections;
-	for (size_t i = 0; i < bee_hdr->sections_count; i++) {
-		const DWORD raw = isMapped ? rs_section[i].va : rs_section[i].raw_addr;
-		::memcpy((BYTE*)((ULONG_PTR)out_buf + rs_section[i].va), (BYTE*)((ULONG_PTR)in_buf + raw), rs_section[i].size);
+			<< "Flags: " << rs_section[i].flags << "\n";
 	}
 }
 
 namespace xs_exe {
+
+	namespace xs1 {
+		void print_format(xs_exe::xs1::t_XS_format* xs_hdr)
+		{
+			std::cout << std::hex
+				<< "Magic:         " << xs_hdr->magic
+				<< "\nEP:            " << xs_hdr->entry_point
+				<< "\nModuleSize:    " << xs_hdr->module_size
+				<< "\nSec count:     " << xs_hdr->sections_count
+				<< "\nHdr Size:      " << xs_hdr->hdr_size
+				<< "\nNT magic:      " << xs_hdr->nt_magic
+				<< "\nImp Key:       " << xs_hdr->imp_key
+				<< "\nUnk2           " << xs_hdr->unk_2
+				<< "\n" << std::endl;
+		}
+	};
+
+	namespace xs2 {
+		void print_format(xs_exe::xs2::t_XS_format* xs_hdr)
+		{
+			std::cout << std::hex
+				<< "Magic:         " << xs_hdr->magic
+				<< "\nEP:            " << xs_hdr->entry_point
+				<< "\nModuleSize:    " << xs_hdr->module_size
+				<< "\nSec count:     " << xs_hdr->sections_count
+				<< "\nHdr Size:      " << xs_hdr->hdr_size
+				<< "\nImp Key:       " << xs_hdr->imp_key
+				<< "\nEP Alt         " << xs_hdr->entry_point_alt
+				<< "\n" << std::endl;
+		}
+	};
 
 	int calc_checksum(BYTE* name_ptr, int imp_key)
 	{
@@ -323,16 +346,13 @@ namespace xs_exe {
 		}
 		return imp_key;
 	}
-};
 
-
-namespace xs_exe {
 	class ChecksumFiller : public peconv::ImportThunksCallback
 	{
 	public:
-		ChecksumFiller(BYTE* _modulePtr, size_t _moduleSize, DWORD _imp_key)
+		ChecksumFiller(BYTE* _modulePtr, size_t _moduleSize, DWORD _imp_key, bool _is32b)
 			: ImportThunksCallback(_modulePtr, _moduleSize),
-			imp_key(_imp_key)
+			imp_key(_imp_key), is32b(_is32b)
 		{
 		}
 
@@ -376,24 +396,39 @@ namespace xs_exe {
 			DWORD* checks_ptr = (DWORD*)(by_name->Name);
 			DWORD curr_checks = (*checks_ptr);
 			peconv::get_exported_names(lib, names);
+			bool is_found = false;
 			for (auto itr = names.begin(); itr != names.end(); itr++) {
 				DWORD checks1 = xs_exe::calc_checksum((BYTE*)itr->c_str(), imp_key);
 				if (checks1 == curr_checks) {
+					::memset(by_name->Name, 0, itr->length() + 1);
 					::memcpy(by_name->Name, itr->c_str(), itr->length());
+					is_found = true;
 					break;
 				}
 			}
 			FreeLibrary(lib);
+			if (!is_found) {
+				std::cerr << "Not found: " << lib_name << " Checksum: " << std::hex << curr_checks << "\n";
+			}
 			return true;
 		}
+
 		DWORD imp_key;
+		bool is32b;
 	};
 };
 
-BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
+
+BLOB xs_exe::xs1::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 {
 	BLOB mod = { 0 };
-	t_XS_format *bee_hdr = (t_XS_format*)in_buf;
+	t_XS_format* bee_hdr = (t_XS_format*)in_buf;
+
+	bool is32b = (bee_hdr->nt_magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) ? false : true;
+	if (bee_hdr->nt_magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC && bee_hdr->nt_magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
+		return mod; // not XS1
+	}
+
 	size_t out_size = buf_size > bee_hdr->module_size ? buf_size : bee_hdr->module_size;
 	if (out_size < PAGE_SIZE) out_size = PAGE_SIZE;
 
@@ -402,7 +437,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 
 	::memset(out_buf, 0, out_size);
 
-	print_format(bee_hdr);
+	xs1::print_format(bee_hdr);
 	print_sections(&bee_hdr->sections, bee_hdr->sections_count);
 	print_data_dirs(bee_hdr->data_dir, 3);
 
@@ -469,7 +504,7 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	memcpy(out_buf + imports_raw, rec_imports, imp_area_size);
 	delete[]rec_imports; rec_imports = nullptr;
 
-	xs_exe::ChecksumFiller collector(out_buf, out_size, bee_hdr->imp_key);
+	xs_exe::ChecksumFiller collector(out_buf, out_size, bee_hdr->imp_key, is32b);
 	if (!peconv::process_import_table(out_buf, out_size, &collector)) {
 		std::cerr << "Failed to process the import table\n";
 	}
@@ -479,4 +514,116 @@ BLOB xs_exe::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	mod.pBlobData = out_buf;
 	mod.cbSize = out_size;
 	return mod;
+}
+
+BLOB xs_exe::xs2::unscramble_pe(BYTE* in_buf, size_t buf_size, bool isMapped, bool is32bit)
+{
+	BLOB mod = { 0 };
+	t_XS_format* bee_hdr = (t_XS_format*)in_buf;
+	size_t out_size = buf_size > bee_hdr->module_size ? buf_size : bee_hdr->module_size;
+	if (out_size < PAGE_SIZE) out_size = PAGE_SIZE;
+
+	BYTE* out_buf = (BYTE*)::malloc(out_size);
+	if (!out_buf) return mod;
+
+	::memset(out_buf, 0, out_size);
+
+	print_format(bee_hdr);
+	print_sections(&bee_hdr->sections, bee_hdr->sections_count);
+	print_data_dirs(bee_hdr->data_dir, 3);
+
+	size_t rec_size = PAGE_SIZE;
+	if (bee_hdr->hdr_size > rec_size) {
+		std::cerr << "Invalid hdr size: " << bee_hdr->hdr_size << "\n";
+		return mod;
+	}
+	BYTE* rec_hdr = new BYTE[rec_size];
+	memset(rec_hdr, 0, rec_size);
+
+	IMAGE_DOS_HEADER* dos_hdr = (IMAGE_DOS_HEADER*)rec_hdr;
+	dos_hdr->e_magic = IMAGE_DOS_SIGNATURE;
+	dos_hdr->e_lfanew = sizeof(IMAGE_DOS_HEADER);
+
+	DWORD* pe_ptr = (DWORD*)(dos_hdr->e_lfanew + (ULONG_PTR)rec_hdr);
+	*pe_ptr = IMAGE_NT_SIGNATURE;
+
+	IMAGE_FILE_HEADER* file_hdrs = (IMAGE_FILE_HEADER*)((ULONG_PTR)rec_hdr + dos_hdr->e_lfanew + sizeof(IMAGE_NT_SIGNATURE));
+	if (is32bit) {
+		file_hdrs->Machine = IMAGE_FILE_MACHINE_I386;
+	}
+	else {
+		file_hdrs->Machine = IMAGE_FILE_MACHINE_AMD64;
+	}
+	file_hdrs->NumberOfSections = bee_hdr->sections_count;
+
+	DWORD img_base = isMapped ? 0 : 0x100000;
+	BYTE* opt_hdr = (BYTE*)((ULONG_PTR)file_hdrs + sizeof(IMAGE_FILE_HEADER));
+	size_t opt_hdr_size = 0;
+	if (file_hdrs->Machine == IMAGE_FILE_MACHINE_AMD64) {
+		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE;
+		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER64);
+		IMAGE_OPTIONAL_HEADER64* opt_hdr64 = (IMAGE_OPTIONAL_HEADER64*)opt_hdr;
+		opt_hdr64->Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC;
+		opt_hdr64->ImageBase = img_base;
+		fill_nt_hdrs(bee_hdr, opt_hdr64);
+	}
+	else {
+		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_32BIT_MACHINE;
+		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER32);
+		IMAGE_OPTIONAL_HEADER32* opt_hdr32 = (IMAGE_OPTIONAL_HEADER32*)opt_hdr;
+		opt_hdr32->Magic = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
+		opt_hdr32->ImageBase = img_base;
+		fill_nt_hdrs(bee_hdr, opt_hdr32);
+	}
+
+	file_hdrs->SizeOfOptionalHeader = (WORD)opt_hdr_size;
+	IMAGE_SECTION_HEADER* sec_hdr = (IMAGE_SECTION_HEADER*)((ULONG_PTR)opt_hdr + opt_hdr_size);
+
+	fill_sections(&bee_hdr->sections, sec_hdr, bee_hdr->sections_count);
+
+	copy_sections(bee_hdr, in_buf, out_buf, out_size, isMapped);
+
+	::memcpy(out_buf, rec_hdr, rec_size);
+	delete[]rec_hdr; rec_hdr = nullptr;
+
+	//WARNING: if the file alignment differs from virtual alignmnent it needs to be converted!
+	DWORD imports_raw = bee_hdr->data_dir[XS_IMPORTS].dir_va;
+
+	t_XS_import* rs_import = (t_XS_import*)((ULONG_PTR)out_buf + imports_raw);
+	size_t dlls_count = count_imports(rs_import);
+
+	std::cout << "DLLs count: " << std::dec << dlls_count << std::endl;
+	const size_t imp_area_size = dlls_count * sizeof(IMAGE_IMPORT_DESCRIPTOR);
+
+	BYTE* rec_imports = new BYTE[imp_area_size];
+	memset(rec_imports, 0, imp_area_size);
+	fill_imports(out_buf, rs_import, (IMAGE_IMPORT_DESCRIPTOR*)rec_imports, dlls_count, bee_hdr->imp_key);
+
+	memcpy(out_buf + imports_raw, rec_imports, imp_area_size);
+	delete[]rec_imports; rec_imports = nullptr;
+
+	xs_exe::ChecksumFiller collector(out_buf, out_size, bee_hdr->imp_key, is32bit);
+	if (!peconv::process_import_table(out_buf, out_size, &collector)) {
+		std::cerr << "Failed to process the import table\n";
+	}
+	fill_relocations_table(*bee_hdr, out_buf, img_base);
+	std::cout << "Finished...\n";
+
+	mod.pBlobData = out_buf;
+	mod.cbSize = out_size;
+	return mod;
+}
+
+xs_variants xs_exe::check_xs_variant(BYTE* in_buf)
+{
+	if (!in_buf) return xs_variants::XS_NONE;
+
+	xs1::t_XS_format* xs_hdr = (xs1::t_XS_format*)in_buf;
+	if (xs_hdr->magic != XS_MAGIC) {
+		return xs_variants::XS_NONE;
+	}
+	if (xs_hdr->nt_magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC || xs_hdr->nt_magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
+		return xs_variants::XS_VARIANT1;
+	}
+	return xs_variants::XS_VARIANT2;
 }

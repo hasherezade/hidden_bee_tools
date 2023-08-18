@@ -80,7 +80,21 @@ BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size, bool is_mapped)
 		mod = hs_exe::unscramble_pe(buf, buf_size, is_mapped);
 		break;
 	case RHADAM_XS_FORMAT:
-		mod = xs_exe::unscramble_pe(buf, buf_size, is_mapped);
+		if (xs_exe::check_xs_variant(buf) == xs_exe::XS_VARIANT1) {
+			std::cout << "XS1\n";
+			mod = xs_exe::xs1::unscramble_pe(buf, buf_size, is_mapped);
+		}
+		else {
+			std::cout << "XS2\n";
+#ifdef _WIN64
+			bool is32b = false;
+			std::cout << "Assuming that the module is 64 bit\n";
+#else
+			bool is32b = true;
+			std::cout << "Assuming that the module is 32 bit\n";
+#endif
+			mod = xs_exe::xs2::unscramble_pe(buf, buf_size, is_mapped, is32b);
+		}
 		break;
 	}
 	return mod;
