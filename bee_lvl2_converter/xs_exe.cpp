@@ -137,8 +137,9 @@ bool fill_relocations_table(XS_FORMAT& bee_hdr, BYTE* mapped_xs, DWORD img_base)
 	for (DWORD i = 0; i < reloc_ptr->count; i++) {
 		
 		xs_relocs_block* block = &reloc_ptr->blocks[i];
+#ifdef _DEBUG
 		std::cout << "#"<< i << std::hex << " : page_rva: " << block->page_rva << " count: " << block->entries_count << "\n";
-
+#endif
 		for (DWORD k = 0; k < block->entries_count; ) {
 			
 			if (saved_field) {
@@ -320,7 +321,7 @@ namespace xs_exe {
 	public:
 		ChecksumFiller(BYTE* _modulePtr, size_t _moduleSize, DWORD _imp_key, bool _is32b)
 			: ImportThunksCallback(_modulePtr, _moduleSize),
-			imp_key(_imp_key), is32b(_is32b), not_found(0)
+			imp_key(_imp_key), is32b(_is32b), not_found(0), found(0)
 		{
 		}
 
@@ -339,6 +340,7 @@ namespace xs_exe {
 		}
 
 		size_t countNotFound() { return not_found; }
+		size_t countFound() { return found; }
 
 	protected:
 		template <typename T_FIELD, typename T_IMAGE_THUNK_DATA>
@@ -349,15 +351,13 @@ namespace xs_exe {
 				return false;
 			}
 
-			//thunkToFunc[rva] = func;
 			const std::string short_name = peconv::get_dll_shortname(lib_name);
 			const bool is_by_ord = (desc->u1.Ordinal & ordinal_flag) != 0;
 			if (is_by_ord) {
 				return true;
 			}
-			PIMAGE_IMPORT_BY_NAME by_name = (PIMAGE_IMPORT_BY_NAME)((ULONGLONG)modulePtr + desc->u1.AddressOfData);
-			const DWORD rva = MASK_TO_DWORD((ULONG_PTR)by_name->Name - (ULONG_PTR)modulePtr);
 
+			PIMAGE_IMPORT_BY_NAME by_name = (PIMAGE_IMPORT_BY_NAME)((ULONGLONG)modulePtr + desc->u1.AddressOfData);
 			std::vector<std::string> names;
 			HMODULE lib = LoadLibraryA(lib_name);
 			if (!lib) {
@@ -374,6 +374,7 @@ namespace xs_exe {
 					::memset(by_name->Name, 0, itr->length() + 1);
 					::memcpy(by_name->Name, itr->c_str(), itr->length());
 					is_found = true;
+					found++;
 					break;
 				}
 			}
@@ -390,6 +391,7 @@ namespace xs_exe {
 		bool is32b;
 
 		size_t not_found;
+		size_t found;
 	};
 };
 
@@ -439,6 +441,45 @@ bool fill_headers(BYTE* rec_hdr, bool is32bit, DWORD img_base, XS_FORMAT bee_hdr
 	return fill_sections(&bee_hdr->sections, sec_hdr, bee_hdr->sections_count);
 }
 
+template <typename XS_FORMAT, typename XS_IMPORT>
+bool fill_import_table(XS_FORMAT* bee_hdr, BYTE* out_buf, size_t out_size, bool is32bit)
+{
+	//WARNING: if the file alignment differs from virtual alignmnent it needs to be converted!
+	DWORD imports_raw = bee_hdr->data_dir[XS_IMPORTS].dir_va;
+
+	XS_IMPORT* xs_import = (XS_IMPORT*)((ULONG_PTR)out_buf + imports_raw);
+	size_t dlls_count = count_imports(xs_import);
+
+	std::cout << "DLLs count: " << std::dec << dlls_count << std::endl;
+	const size_t imp_area_size = dlls_count * sizeof(IMAGE_IMPORT_DESCRIPTOR);
+
+	BYTE* rec_imports = new BYTE[imp_area_size];
+	memset(rec_imports, 0, imp_area_size);
+	if (!fill_imports(out_buf, xs_import, (IMAGE_IMPORT_DESCRIPTOR*)rec_imports, dlls_count, bee_hdr->imp_key)) {
+		std::cerr << "Failed to fill imports\n";
+	}
+
+	memcpy(out_buf + imports_raw, rec_imports, imp_area_size);
+	delete[]rec_imports; rec_imports = nullptr;
+
+	xs_exe::ChecksumFiller collector(out_buf, out_size, bee_hdr->imp_key, is32bit);
+	if (!peconv::process_import_table(out_buf, out_size, &collector)) {
+		std::cerr << "Failed to process the import table\n";
+	}
+	std::cout << "Filled " << collector.countFound() << " imports\n";
+	if ((collector.countNotFound() > 0) || (collector.countFound() < dlls_count)) {
+		std::cerr << "WARNING: Some imports could not be found. It is possible that the bitness of the payload mismatch the bitness of converter. Try to use a ";
+#ifdef _WIN64
+			std::cerr << "32";
+#else
+			std::cerr << "64";
+#endif
+		std::cerr << "-bit converter." << std::endl;
+		return false;
+	}
+	return true;
+}
+
 
 BLOB xs_exe::xs1::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 {
@@ -476,28 +517,7 @@ BLOB xs_exe::xs1::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	::memcpy(out_buf, rec_hdr, rec_size);
 	delete[]rec_hdr; rec_hdr = nullptr;
 
-	//WARNING: if the file alignment differs from virtual alignmnent it needs to be converted!
-	DWORD imports_raw = bee_hdr->data_dir[XS_IMPORTS].dir_va;
-
-	t_XS_import *xs_import = (t_XS_import*)((ULONG_PTR)out_buf + imports_raw);
-	size_t dlls_count = count_imports(xs_import);
-
-	std::cout << "DLLs count: " << std::dec << dlls_count << std::endl;
-	const size_t imp_area_size = dlls_count * sizeof(IMAGE_IMPORT_DESCRIPTOR);
-
-	BYTE *rec_imports = new BYTE[imp_area_size];
-	memset(rec_imports, 0, imp_area_size);
-	if (!fill_imports(out_buf, xs_import, (IMAGE_IMPORT_DESCRIPTOR*)rec_imports, dlls_count, bee_hdr->imp_key)) {
-		std::cerr << "Failed to fill imports\n";
-	}
-
-	memcpy(out_buf + imports_raw, rec_imports, imp_area_size);
-	delete[]rec_imports; rec_imports = nullptr;
-
-	xs_exe::ChecksumFiller collector(out_buf, out_size, bee_hdr->imp_key, is32b);
-	if (!peconv::process_import_table(out_buf, out_size, &collector)) {
-		std::cerr << "Failed to process the import table\n";
-	}
+	fill_import_table<t_XS_format, t_XS_import>(bee_hdr, out_buf, out_size, is32b);
 	
 	fill_relocations_table(*bee_hdr, out_buf, img_base);
 	std::cout << "Finished...\n";
@@ -537,34 +557,10 @@ BLOB xs_exe::xs2::unscramble_pe(BYTE* in_buf, size_t buf_size, bool isMapped, bo
 	::memcpy(out_buf, rec_hdr, rec_size);
 	delete[]rec_hdr; rec_hdr = nullptr;
 
-	//WARNING: if the file alignment differs from virtual alignmnent it needs to be converted!
-	DWORD imports_raw = bee_hdr->data_dir[XS_IMPORTS].dir_va;
-
-	t_XS_import* xs_import = (t_XS_import*)((ULONG_PTR)out_buf + imports_raw);
-	size_t dlls_count = count_imports(xs_import);
-
-	std::cout << "DLLs count: " << std::dec << dlls_count << std::endl;
-	const size_t imp_area_size = dlls_count * sizeof(IMAGE_IMPORT_DESCRIPTOR);
-
-	BYTE* rec_imports = new BYTE[imp_area_size];
-	memset(rec_imports, 0, imp_area_size);
-	if (!fill_imports(out_buf, xs_import, (IMAGE_IMPORT_DESCRIPTOR*)rec_imports, dlls_count, bee_hdr->imp_key)) {
-		std::cerr << "Failed to fill imports\n";
-	}
-
-	memcpy(out_buf + imports_raw, rec_imports, imp_area_size);
-	delete[]rec_imports; rec_imports = nullptr;
-
-	xs_exe::ChecksumFiller collector(out_buf, out_size, bee_hdr->imp_key, is32bit);
-	if (!peconv::process_import_table(out_buf, out_size, &collector)) {
-		std::cerr << "Failed to process the import table\n";
-	}
+	fill_import_table<t_XS_format, t_XS_import>(bee_hdr, out_buf, out_size, is32bit);
 
 	fill_relocations_table(*bee_hdr, out_buf, img_base);
 	std::cout << "Finished...\n";
-	if (collector.countNotFound() > 0) {
-		std::cerr << "WARNING: Some imports could not be found. It is possible that the bitness of the payload mismatch the bitness of converter. Try to use a converter of different bitness." << std::endl;
-	}
 	mod.pBlobData = out_buf;
 	mod.cbSize = out_size;
 	return mod;
