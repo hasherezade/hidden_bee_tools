@@ -320,7 +320,7 @@ namespace xs_exe {
 	public:
 		ChecksumFiller(BYTE* _modulePtr, size_t _moduleSize, DWORD _imp_key, bool _is32b)
 			: ImportThunksCallback(_modulePtr, _moduleSize),
-			imp_key(_imp_key), is32b(_is32b)
+			imp_key(_imp_key), is32b(_is32b), not_found(0)
 		{
 		}
 
@@ -338,12 +338,14 @@ namespace xs_exe {
 			}
 		}
 
+		size_t countNotFound() { return not_found; }
+
 	protected:
 		template <typename T_FIELD, typename T_IMAGE_THUNK_DATA>
 		bool processThunks_tpl(LPSTR lib_name, T_IMAGE_THUNK_DATA* desc, T_FIELD* call_via, T_FIELD ordinal_flag)
 		{
 			if (call_via == nullptr) {
-				std::cout << "Call via is empty!\n";
+				std::cerr << "Call via is empty!\n";
 				return false;
 			}
 
@@ -358,9 +360,10 @@ namespace xs_exe {
 
 			std::vector<std::string> names;
 			HMODULE lib = LoadLibraryA(lib_name);
-			if (!lib) return false;
-
-
+			if (!lib) {
+				std::cerr << "Library not found: " << lib_name << std::endl;
+				return false;
+			}
 			DWORD* checks_ptr = (DWORD*)(by_name->Name);
 			DWORD curr_checks = (*checks_ptr);
 			peconv::get_exported_names(lib, names);
@@ -376,13 +379,17 @@ namespace xs_exe {
 			}
 			FreeLibrary(lib);
 			if (!is_found) {
+				not_found++;
 				std::cerr << "Not found: " << lib_name << " Checksum: " << std::hex << curr_checks << "\n";
+				return false;
 			}
 			return true;
 		}
 
 		DWORD imp_key;
 		bool is32b;
+
+		size_t not_found;
 	};
 };
 
@@ -552,9 +559,12 @@ BLOB xs_exe::xs2::unscramble_pe(BYTE* in_buf, size_t buf_size, bool isMapped, bo
 	if (!peconv::process_import_table(out_buf, out_size, &collector)) {
 		std::cerr << "Failed to process the import table\n";
 	}
+
 	fill_relocations_table(*bee_hdr, out_buf, img_base);
 	std::cout << "Finished...\n";
-
+	if (collector.countNotFound() > 0) {
+		std::cerr << "WARNING: Some imports could not be found. It is possible that the bitness of the payload mismatch the bitness of converter. Try to use a converter of different bitness." << std::endl;
+	}
 	mod.pBlobData = out_buf;
 	mod.cbSize = out_size;
 	return mod;
