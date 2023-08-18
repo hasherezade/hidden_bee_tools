@@ -387,6 +387,52 @@ namespace xs_exe {
 };
 
 
+template <typename XS_FORMAT>
+bool fill_headers(BYTE* rec_hdr, bool is32bit, DWORD img_base, XS_FORMAT bee_hdr)
+{
+	IMAGE_DOS_HEADER* dos_hdr = (IMAGE_DOS_HEADER*)rec_hdr;
+	dos_hdr->e_magic = IMAGE_DOS_SIGNATURE;
+	dos_hdr->e_lfanew = sizeof(IMAGE_DOS_HEADER);
+
+	DWORD* pe_ptr = (DWORD*)(dos_hdr->e_lfanew + (ULONG_PTR)rec_hdr);
+	*pe_ptr = IMAGE_NT_SIGNATURE;
+
+	IMAGE_FILE_HEADER* file_hdrs = (IMAGE_FILE_HEADER*)((ULONG_PTR)rec_hdr + dos_hdr->e_lfanew + sizeof(IMAGE_NT_SIGNATURE));
+	if (is32bit) {
+		file_hdrs->Machine = IMAGE_FILE_MACHINE_I386;
+	}
+	else {
+		file_hdrs->Machine = IMAGE_FILE_MACHINE_AMD64;
+	}
+	file_hdrs->NumberOfSections = bee_hdr->sections_count;
+
+	//DWORD img_base = isMapped ? 0 : 0x100000;
+	BYTE* opt_hdr = (BYTE*)((ULONG_PTR)file_hdrs + sizeof(IMAGE_FILE_HEADER));
+	size_t opt_hdr_size = 0;
+	if (file_hdrs->Machine == IMAGE_FILE_MACHINE_AMD64) {
+		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE;
+		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER64);
+		IMAGE_OPTIONAL_HEADER64* opt_hdr64 = (IMAGE_OPTIONAL_HEADER64*)opt_hdr;
+		opt_hdr64->Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC;
+		opt_hdr64->ImageBase = img_base;
+		fill_nt_hdrs(bee_hdr, opt_hdr64);
+	}
+	else {
+		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_32BIT_MACHINE;
+		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER32);
+		IMAGE_OPTIONAL_HEADER32* opt_hdr32 = (IMAGE_OPTIONAL_HEADER32*)opt_hdr;
+		opt_hdr32->Magic = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
+		opt_hdr32->ImageBase = img_base;
+		fill_nt_hdrs(bee_hdr, opt_hdr32);
+	}
+
+	file_hdrs->SizeOfOptionalHeader = (WORD)opt_hdr_size;
+
+	IMAGE_SECTION_HEADER* sec_hdr = (IMAGE_SECTION_HEADER*)((ULONG_PTR)opt_hdr + opt_hdr_size);
+	return fill_sections(&bee_hdr->sections, sec_hdr, bee_hdr->sections_count);
+}
+
+
 BLOB xs_exe::xs1::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 {
 	BLOB mod = { 0 };
@@ -412,44 +458,11 @@ BLOB xs_exe::xs1::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	size_t rec_size = PAGE_SIZE;
 	if (bee_hdr->hdr_size > rec_size) return mod;
 
+	DWORD img_base = isMapped ? 0 : 0x100000;
 	BYTE *rec_hdr = new BYTE[rec_size];
 	memset(rec_hdr, 0, rec_size);
 
-	IMAGE_DOS_HEADER* dos_hdr = (IMAGE_DOS_HEADER*)rec_hdr;
-	dos_hdr->e_magic = IMAGE_DOS_SIGNATURE;
-	dos_hdr->e_lfanew = sizeof(IMAGE_DOS_HEADER);
-
-	DWORD *pe_ptr = (DWORD*)(dos_hdr->e_lfanew + (ULONG_PTR)rec_hdr);
-	*pe_ptr = IMAGE_NT_SIGNATURE;
-
-	IMAGE_FILE_HEADER* file_hdrs = (IMAGE_FILE_HEADER*)((ULONG_PTR)rec_hdr + dos_hdr->e_lfanew + sizeof(IMAGE_NT_SIGNATURE));
-	file_hdrs->Machine = (bee_hdr->nt_magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) ? IMAGE_FILE_MACHINE_AMD64 : IMAGE_FILE_MACHINE_I386; // 32 bit only
-	file_hdrs->NumberOfSections = bee_hdr->sections_count;
-
-	DWORD img_base = isMapped ? 0 : 0x100000;
-	BYTE *opt_hdr = (BYTE*)((ULONG_PTR)file_hdrs + sizeof(IMAGE_FILE_HEADER));
-	size_t opt_hdr_size = 0;
-	if (file_hdrs->Machine == IMAGE_FILE_MACHINE_AMD64) {
-		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE;
-		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER64);
-		IMAGE_OPTIONAL_HEADER64* opt_hdr64 = (IMAGE_OPTIONAL_HEADER64*)opt_hdr;
-		opt_hdr64->Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC;
-		opt_hdr64->ImageBase = img_base;
-		fill_nt_hdrs(bee_hdr, opt_hdr64);
-	}
-	else {
-		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_32BIT_MACHINE;
-		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER32);
-		IMAGE_OPTIONAL_HEADER32* opt_hdr32 = (IMAGE_OPTIONAL_HEADER32*)opt_hdr;
-		opt_hdr32->Magic = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
-		opt_hdr32->ImageBase = img_base;
-		fill_nt_hdrs(bee_hdr, opt_hdr32);
-	}
-
-	file_hdrs->SizeOfOptionalHeader = (WORD)opt_hdr_size;
-	IMAGE_SECTION_HEADER *sec_hdr = (IMAGE_SECTION_HEADER*)((ULONG_PTR)opt_hdr + opt_hdr_size);
-
-	fill_sections(&bee_hdr->sections, sec_hdr, bee_hdr->sections_count);
+	fill_headers(rec_hdr, is32b, img_base, bee_hdr);
 
 	copy_sections(bee_hdr, in_buf, out_buf, out_size, isMapped);
 
@@ -459,15 +472,17 @@ BLOB xs_exe::xs1::unscramble_pe(BYTE *in_buf, size_t buf_size, bool isMapped)
 	//WARNING: if the file alignment differs from virtual alignmnent it needs to be converted!
 	DWORD imports_raw = bee_hdr->data_dir[XS_IMPORTS].dir_va;
 
-	t_XS_import *rs_import = (t_XS_import*)((ULONG_PTR)out_buf + imports_raw);
-	size_t dlls_count = count_imports(rs_import);
+	t_XS_import *xs_import = (t_XS_import*)((ULONG_PTR)out_buf + imports_raw);
+	size_t dlls_count = count_imports(xs_import);
 
 	std::cout << "DLLs count: " << std::dec << dlls_count << std::endl;
 	const size_t imp_area_size = dlls_count * sizeof(IMAGE_IMPORT_DESCRIPTOR);
 
 	BYTE *rec_imports = new BYTE[imp_area_size];
 	memset(rec_imports, 0, imp_area_size);
-	fill_imports(out_buf, rs_import, (IMAGE_IMPORT_DESCRIPTOR*)rec_imports, dlls_count, bee_hdr->imp_key);
+	if (!fill_imports(out_buf, xs_import, (IMAGE_IMPORT_DESCRIPTOR*)rec_imports, dlls_count, bee_hdr->imp_key)) {
+		std::cerr << "Failed to fill imports\n";
+	}
 
 	memcpy(out_buf + imports_raw, rec_imports, imp_area_size);
 	delete[]rec_imports; rec_imports = nullptr;
@@ -505,50 +520,11 @@ BLOB xs_exe::xs2::unscramble_pe(BYTE* in_buf, size_t buf_size, bool isMapped, bo
 		std::cerr << "Invalid hdr size: " << bee_hdr->hdr_size << "\n";
 		return mod;
 	}
+	DWORD img_base = isMapped ? 0 : 0x100000;
 	BYTE* rec_hdr = new BYTE[rec_size];
 	memset(rec_hdr, 0, rec_size);
 
-	IMAGE_DOS_HEADER* dos_hdr = (IMAGE_DOS_HEADER*)rec_hdr;
-	dos_hdr->e_magic = IMAGE_DOS_SIGNATURE;
-	dos_hdr->e_lfanew = sizeof(IMAGE_DOS_HEADER);
-
-	DWORD* pe_ptr = (DWORD*)(dos_hdr->e_lfanew + (ULONG_PTR)rec_hdr);
-	*pe_ptr = IMAGE_NT_SIGNATURE;
-
-	IMAGE_FILE_HEADER* file_hdrs = (IMAGE_FILE_HEADER*)((ULONG_PTR)rec_hdr + dos_hdr->e_lfanew + sizeof(IMAGE_NT_SIGNATURE));
-	if (is32bit) {
-		file_hdrs->Machine = IMAGE_FILE_MACHINE_I386;
-	}
-	else {
-		file_hdrs->Machine = IMAGE_FILE_MACHINE_AMD64;
-	}
-	file_hdrs->NumberOfSections = bee_hdr->sections_count;
-
-	DWORD img_base = isMapped ? 0 : 0x100000;
-	BYTE* opt_hdr = (BYTE*)((ULONG_PTR)file_hdrs + sizeof(IMAGE_FILE_HEADER));
-	size_t opt_hdr_size = 0;
-	if (file_hdrs->Machine == IMAGE_FILE_MACHINE_AMD64) {
-		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE;
-		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER64);
-		IMAGE_OPTIONAL_HEADER64* opt_hdr64 = (IMAGE_OPTIONAL_HEADER64*)opt_hdr;
-		opt_hdr64->Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC;
-		opt_hdr64->ImageBase = img_base;
-		fill_nt_hdrs(bee_hdr, opt_hdr64);
-	}
-	else {
-		file_hdrs->Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_32BIT_MACHINE;
-		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER32);
-		IMAGE_OPTIONAL_HEADER32* opt_hdr32 = (IMAGE_OPTIONAL_HEADER32*)opt_hdr;
-		opt_hdr32->Magic = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
-		opt_hdr32->ImageBase = img_base;
-		fill_nt_hdrs(bee_hdr, opt_hdr32);
-	}
-
-	file_hdrs->SizeOfOptionalHeader = (WORD)opt_hdr_size;
-	IMAGE_SECTION_HEADER* sec_hdr = (IMAGE_SECTION_HEADER*)((ULONG_PTR)opt_hdr + opt_hdr_size);
-
-	fill_sections(&bee_hdr->sections, sec_hdr, bee_hdr->sections_count);
-
+	fill_headers(rec_hdr, is32bit, img_base, bee_hdr);
 	copy_sections(bee_hdr, in_buf, out_buf, out_size, isMapped);
 
 	::memcpy(out_buf, rec_hdr, rec_size);
@@ -557,15 +533,17 @@ BLOB xs_exe::xs2::unscramble_pe(BYTE* in_buf, size_t buf_size, bool isMapped, bo
 	//WARNING: if the file alignment differs from virtual alignmnent it needs to be converted!
 	DWORD imports_raw = bee_hdr->data_dir[XS_IMPORTS].dir_va;
 
-	t_XS_import* rs_import = (t_XS_import*)((ULONG_PTR)out_buf + imports_raw);
-	size_t dlls_count = count_imports(rs_import);
+	t_XS_import* xs_import = (t_XS_import*)((ULONG_PTR)out_buf + imports_raw);
+	size_t dlls_count = count_imports(xs_import);
 
 	std::cout << "DLLs count: " << std::dec << dlls_count << std::endl;
 	const size_t imp_area_size = dlls_count * sizeof(IMAGE_IMPORT_DESCRIPTOR);
 
 	BYTE* rec_imports = new BYTE[imp_area_size];
 	memset(rec_imports, 0, imp_area_size);
-	fill_imports(out_buf, rs_import, (IMAGE_IMPORT_DESCRIPTOR*)rec_imports, dlls_count, bee_hdr->imp_key);
+	if (!fill_imports(out_buf, xs_import, (IMAGE_IMPORT_DESCRIPTOR*)rec_imports, dlls_count, bee_hdr->imp_key)) {
+		std::cerr << "Failed to fill imports\n";
+	}
 
 	memcpy(out_buf + imports_raw, rec_imports, imp_area_size);
 	delete[]rec_imports; rec_imports = nullptr;
