@@ -470,9 +470,9 @@ bool fill_import_table(XS_FORMAT* bee_hdr, BYTE* out_buf, size_t out_size, bool 
 	if ((collector.countNotFound() > 0) || (collector.countFound() < dlls_count)) {
 		std::cerr << "WARNING: Some imports could not be found. It is possible that the bitness of the payload mismatch the bitness of converter. Try to use a ";
 #ifdef _WIN64
-			std::cerr << "32";
+		std::cerr << "32";
 #else
-			std::cerr << "64";
+		std::cerr << "64";
 #endif
 		std::cerr << "-bit converter." << std::endl;
 		return false;
