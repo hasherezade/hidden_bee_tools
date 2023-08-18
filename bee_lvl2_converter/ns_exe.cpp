@@ -6,26 +6,11 @@
 
 using namespace ns_exe;
 
-DWORD calc_sec_alignment(t_NS_section *ns_section, size_t sections_count, bool is_virtual=true)
-{
-	DWORD prev = 0;
-	for (size_t i = 0; i < sections_count; i++) {
-		DWORD section_offst = is_virtual ? ns_section[i].va : ns_section[i].raw_addr;
-		if (prev != 0) {
-			prev = gcd(prev, section_offst);
-		}
-		else {
-			prev = section_offst;
-		}
-	}
-	return prev;
-}
-
 template <typename T_IMAGE_OPTIONAL_HEADER>
 bool fill_nt_hdrs(t_NS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 {
-	nt_hdr->SectionAlignment = calc_sec_alignment(&bee_hdr->sections, bee_hdr->sections_count, true);
-	nt_hdr->FileAlignment = calc_sec_alignment(&bee_hdr->sections, bee_hdr->sections_count, false);
+	nt_hdr->SectionAlignment = util::calc_sec_alignment(&bee_hdr->sections, bee_hdr->sections_count, true);
+	nt_hdr->FileAlignment = util::calc_sec_alignment(&bee_hdr->sections, bee_hdr->sections_count, false);
 	if (nt_hdr->SectionAlignment != nt_hdr->FileAlignment) {
 		std::cout << "[WARNING] Raw Alignment if different than Virtual Alignment!\n";
 	}

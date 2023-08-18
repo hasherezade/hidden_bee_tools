@@ -9,44 +9,11 @@
 #include "util.h"
 using namespace rs_exe;
 
-
-namespace rs_exe {
-	DWORD calc_sec_alignment(t_RS_section* section, size_t sections_count, bool is_virtual = true)
-	{
-		DWORD prev = 0;
-		for (size_t i = 0; i < sections_count; i++) {
-			DWORD section_offst = is_virtual ? section[i].va : section[i].raw_addr;
-			if (prev != 0) {
-				prev = gcd(prev, section_offst);
-			}
-			else {
-				prev = section_offst;
-			}
-		}
-		return prev;
-	}
-
-	DWORD get_first_section(t_RS_section* section, size_t sections_count, bool is_virtual = true)
-	{
-		DWORD min = 0;
-		for (size_t i = 0; i < sections_count; i++) {
-			DWORD section_offst = is_virtual ? section[i].va : section[i].raw_addr;
-			if (min != 0) {
-				min = min < section_offst ? min : section_offst;
-			}
-			else {
-				min = section_offst;
-			}
-		}
-		return min;
-	}
-}
-
 template <typename T_IMAGE_OPTIONAL_HEADER>
 bool fill_nt_hdrs(t_RS_format *bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 {
-	const int kMinAlign = get_first_section(&bee_hdr->sections, bee_hdr->sections_count, true);
-	nt_hdr->SectionAlignment = calc_sec_alignment(&bee_hdr->sections, bee_hdr->sections_count, true);
+	const int kMinAlign = util::get_first_section(&bee_hdr->sections, bee_hdr->sections_count, true);
+	nt_hdr->SectionAlignment = util::calc_sec_alignment(&bee_hdr->sections, bee_hdr->sections_count, true);
 	nt_hdr->FileAlignment = nt_hdr->SectionAlignment;
 
 	nt_hdr->ImageBase = 0;
