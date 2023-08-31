@@ -6,8 +6,19 @@ Converts a custom executable formats used by:
   
 into a PE.
 
-#  Supported formats
+# Usage
 
+```
+Converter for Hidden Bee & Rhadamanthys custom executable formats
+Args: <input module> <is_mapped?> <module base>
+```
+
++ `input module` -> custom module of Hidden Bee or Rhadamanthys, in one of the supported formats (see below)
++ `is_mapped` -> `0` if the module in a raw format, `1` if in virtual.
++ `module base` -> if the module was relocated to the load base, you need to input the base here
+
+
+#  Supported formats
 
 ## Rhadamanthys
 + RS
