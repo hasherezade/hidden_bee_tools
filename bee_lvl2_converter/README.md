@@ -14,6 +14,8 @@ into a PE.
 + HS
 + XS (v1 and v2)
 
+More details: https://research.checkpoint.com/2023/from-hidden-bee-to-rhadamanthys-the-evolution-of-custom-executable-formats/
+
 ## Hidden Bee
 + NE
 + NS
