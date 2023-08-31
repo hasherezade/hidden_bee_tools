@@ -1,19 +1,31 @@
 # bee_lvl2_converter
 
-Converts a custom format (scrambled PE) used by the elements of the Hidden Bee miner into a valid PE.<br/>
-<hr/>
+Converts a custom executable formats used by:
++    Hidden Bee miner
++    Rhadamanthys stealer
+  
+into a PE.
 
-NE Format:
----
+#  Supported formats
+
+
+## Rhadamanthys
++ RS
++ HS
++ XS (v1 and v2)
+
+## Hidden Bee
++ NS
++ NE
+
+
+### NE Format:
 
 Changes in the PE header:<br/>
 
 ![diagram](../pics/scrambled_pe1.png)
-<br/>
-<hr/>
 
-NS Format:
----
+### NS Format:
 
 Changes in the PE header:<br/>
 
