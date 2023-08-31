@@ -15,8 +15,8 @@ into a PE.
 + XS (v1 and v2)
 
 ## Hidden Bee
-+ NS
 + NE
++ NS
 
 
 ### NE Format:
