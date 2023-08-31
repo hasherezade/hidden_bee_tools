@@ -9,7 +9,11 @@ int main(int argc, char *argv[])
 {
 	if (argc < 3) {
 		std::cout << "Converter for Hidden Bee & Rhadamanthys custom executable formats\n";
-		std::cout << "Args: <input bee module> <is_mapped?> <module base>" << std::endl;
+		std::cout << "Args: <input_module> <is_mapped?> <module_base:hex>\n";
+		std::cout << "\t*input_module : custom module of Hidden Bee or Rhadamanthys, in one of the supported formats.\n";
+		std::cout << "\t*is_mapped? : 0 if the module in a raw format, 1 if in virtual.\n";
+		std::cout << "\t*module_base:hex : if the module was relocated to the load base, you need to input the base here.\n";
+		std::cout << std::endl;
 		system("pause");
 		return -1;
 	}
