@@ -7,6 +7,10 @@
 #include <vector>
 
 #include "util.h"
+
+#define DEFAULT_BASE64 0x140000000
+#define DEFAULT_BASE32 0x400000
+
 using namespace xs_exe;
 
 template <typename XS_FORMAT, typename T_IMAGE_OPTIONAL_HEADER>
@@ -23,6 +27,8 @@ bool fill_nt_hdrs(XS_FORMAT* bee_hdr, T_IMAGE_OPTIONAL_HEADER *nt_hdr)
 
 	nt_hdr->Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI;
 	nt_hdr->NumberOfRvaAndSizes = 16;
+	nt_hdr->MajorSubsystemVersion = 6;
+	nt_hdr->MajorOperatingSystemVersion = 6;
 
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress = bee_hdr->data_dir[XS_IMPORTS].dir_va;
 	nt_hdr->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size = bee_hdr->data_dir[XS_IMPORTS].dir_size;
@@ -114,8 +120,8 @@ bool build_relocs_table(BYTE* mapped_xs, std::map<DWORD, std::vector<DWORD>>& re
 	return is_ok;
 }
 
-template <typename XS_FORMAT>
-bool fill_relocations_table(XS_FORMAT& bee_hdr, BYTE* mapped_xs, DWORD img_base)
+template <typename XS_FORMAT, typename FIELD_T>
+bool fill_relocations_table(XS_FORMAT& bee_hdr, BYTE* mapped_xs, FIELD_T img_base)
 {
 	if (!mapped_xs) return false;
 
@@ -147,7 +153,7 @@ bool fill_relocations_table(XS_FORMAT& bee_hdr, BYTE* mapped_xs, DWORD img_base)
 				saved_field = 0;
 
 				relocs_list[block->page_rva].push_back(field_rva);
-				DWORD* field = (DWORD*)((ULONG_PTR)mapped_xs + block->page_rva + field_rva);
+				FIELD_T* field = (FIELD_T*)((ULONG_PTR)mapped_xs + block->page_rva + field_rva);
 				(*field) += img_base;
 #ifdef _DEBUG
 				std::cout << k << " : saved:" << " Field to reloc: " << field_rva << " Relocated: " << (*field) << " \n";
@@ -170,7 +176,7 @@ bool fill_relocations_table(XS_FORMAT& bee_hdr, BYTE* mapped_xs, DWORD img_base)
 					break;
 				}
 				relocs_list[block->page_rva].push_back(field_rva);
-				DWORD* field = (DWORD*)((ULONG_PTR)mapped_xs + block->page_rva + field_rva);
+				FIELD_T* field = (FIELD_T*)((ULONG_PTR)mapped_xs + block->page_rva + field_rva);
 				(*field) += img_base;
 #ifdef _DEBUG
 				std::cout << k << " : " << indx << " Field to reloc: " << field_rva <<  " Relocated: " << (*field) << " \n";
@@ -397,7 +403,7 @@ namespace xs_exe {
 
 
 template <typename XS_FORMAT>
-bool fill_headers(BYTE* rec_hdr, bool is32bit, DWORD img_base, XS_FORMAT bee_hdr)
+bool fill_headers(BYTE* rec_hdr, bool is32bit, ULONGLONG img_base, XS_FORMAT bee_hdr)
 {
 	IMAGE_DOS_HEADER* dos_hdr = (IMAGE_DOS_HEADER*)rec_hdr;
 	dos_hdr->e_magic = IMAGE_DOS_SIGNATURE;
@@ -415,7 +421,6 @@ bool fill_headers(BYTE* rec_hdr, bool is32bit, DWORD img_base, XS_FORMAT bee_hdr
 	}
 	file_hdrs->NumberOfSections = bee_hdr->sections_count;
 
-	//DWORD img_base = isMapped ? 0 : 0x100000;
 	BYTE* opt_hdr = (BYTE*)((ULONG_PTR)file_hdrs + sizeof(IMAGE_FILE_HEADER));
 	size_t opt_hdr_size = 0;
 	if (file_hdrs->Machine == IMAGE_FILE_MACHINE_AMD64) {
@@ -431,7 +436,7 @@ bool fill_headers(BYTE* rec_hdr, bool is32bit, DWORD img_base, XS_FORMAT bee_hdr
 		opt_hdr_size = sizeof(IMAGE_OPTIONAL_HEADER32);
 		IMAGE_OPTIONAL_HEADER32* opt_hdr32 = (IMAGE_OPTIONAL_HEADER32*)opt_hdr;
 		opt_hdr32->Magic = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
-		opt_hdr32->ImageBase = img_base;
+		opt_hdr32->ImageBase = (DWORD)img_base;
 		fill_nt_hdrs(bee_hdr, opt_hdr32);
 	}
 
@@ -547,7 +552,9 @@ BLOB xs_exe::xs2::unscramble_pe(BYTE* in_buf, size_t buf_size, bool isMapped, bo
 		std::cerr << "Invalid hdr size: " << bee_hdr->hdr_size << "\n";
 		return mod;
 	}
-	DWORD img_base = isMapped ? 0 : 0x100000;
+	ULONGLONG img_base = 0;
+	if (!isMapped) img_base = is32bit ? DEFAULT_BASE32 : DEFAULT_BASE64;
+
 	BYTE* rec_hdr = new BYTE[rec_size];
 	memset(rec_hdr, 0, rec_size);
 
@@ -559,7 +566,12 @@ BLOB xs_exe::xs2::unscramble_pe(BYTE* in_buf, size_t buf_size, bool isMapped, bo
 
 	fill_import_table<t_XS_format, t_XS_import>(bee_hdr, out_buf, out_size, is32bit);
 
-	fill_relocations_table(*bee_hdr, out_buf, img_base);
+	if (is32bit) {
+		fill_relocations_table(*bee_hdr, out_buf, (DWORD)img_base);
+	}
+	else {
+		fill_relocations_table(*bee_hdr, out_buf, (ULONGLONG)img_base);
+	}
 	std::cout << "Finished...\n";
 	mod.pBlobData = out_buf;
 	mod.cbSize = out_size;
