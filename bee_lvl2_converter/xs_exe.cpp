@@ -343,7 +343,7 @@ namespace xs_exe {
 				<< "\nHdr Size:      " << xs_hdr->hdr_size
 				<< "\nNT magic:      " << xs_hdr->nt_magic
 				<< "\nImp Key:       " << xs_hdr->imp_key
-				<< "\nUnk            " << xs_hdr->unk
+				<< "\nUnk            " << (unsigned int)xs_hdr->unk
 				<< "\n" << std::endl;
 		}
 	};
