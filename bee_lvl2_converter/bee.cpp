@@ -85,11 +85,11 @@ BLOB unscramble_bee_to_pe(BYTE *buf, size_t buf_size, bool is_mapped)
 			std::cout << "XS1 variant A (Rhadamanthys v. < 0.9.0)\n";
 			mod = xs_exe::xs1::unscramble_pe_A(buf, buf_size, is_mapped);
 		}
-		if (format == xs_exe::XS_VARIANT1_B) {
+		else if (format == xs_exe::XS_VARIANT1_B) {
 			std::cout << "XS1 variant B (Rhadamanthys v. >= 0.9.0)\n";
 			mod = xs_exe::xs1::unscramble_pe_B(buf, buf_size, is_mapped);
 		}
-		if (format == xs_exe::XS_VARIANT2) {
+		else if (format == xs_exe::XS_VARIANT2) {
 			std::cout << "XS2\n";
 #ifdef _WIN64
 			bool is32b = false;

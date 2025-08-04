@@ -201,7 +201,25 @@ size_t count_imports(XS_IMPORT *xs_import)
 	return 0;
 }
 
-void __cdecl decode_name_A(BYTE* library_name, WORD lib_decode_key)
+bool is_valid_dll_char(BYTE c)
+{
+	if (!isalnum(c) && c != '.' && c != '_' && c != '-') {
+		return false;
+	}
+	return true;
+}
+
+bool is_valid_dll_name(BYTE* lib, size_t name_len)
+{
+	for (size_t i = 0; i < name_len; i++) {
+		if (!is_valid_dll_char(lib[i])) {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool decode_name_A(BYTE* library_name, WORD lib_decode_key)
 {
 	BYTE* _val_ptr = 0; // eax
 	char flag; // dl
@@ -221,13 +239,18 @@ void __cdecl decode_name_A(BYTE* library_name, WORD lib_decode_key)
 			++_val_ptr;
 		} while ( true );
 	}
+	const size_t len = (_val_ptr - library_name);
+	if (!is_valid_dll_name(library_name, len)) {
+		return false;
+	}
 	std::cout << "Name: " << library_name << "\n";
+	return true;
 }
 
-void __cdecl decode_name_B(BYTE* dll_name, size_t name_len)
+bool decode_name_B(BYTE* dll_name, size_t name_len)
 {
 	if (!name_len) {
-		return;
+		return false;
 	}
 
 	BYTE out_name[128] = { 0 };
@@ -260,37 +283,77 @@ void __cdecl decode_name_B(BYTE* dll_name, size_t name_len)
 			}
 			outC |= (flag != 0) << (round - 1);
 		}
+		if (!is_valid_dll_char(outC)) {
+			return false;
+		}
 		out_name[i] = outC;
 	}
-
 	out_name[name_len] = 0;
 	::memcpy(dll_name, out_name, name_len);
 	std::cout << "Name dec: " << dll_name << "\n";
+	return true;
 }
 
+namespace xs_exe {
+	namespace xs2 {
+
+		int get_xs_import_type(t_XS_format* mapped_xs, BYTE* out_buf, size_t buf_size)
+		{
+			const DWORD imports_raw = mapped_xs->data_dir[XS_IMPORTS].dir_va;
+			const t_XS_import_A* xs_import = (t_XS_import_A*)((ULONG_PTR)out_buf + imports_raw);
+			if (xs_import[0].first_thunk == 0) {
+				return 0;
+			}
+			if (xs_import[0].dll_name_rva > buf_size) {
+				return 0;
+			}
+			const size_t temp_size = 128;
+			BYTE temp_name[temp_size] = { 0 };
+			BYTE* lib_name = (BYTE*)((ULONG_PTR)out_buf + xs_import[0].dll_name_rva);
+
+			const size_t imp_len = xs_import[0].obf_dll_len > temp_size ? temp_size : xs_import[0].obf_dll_len;
+			::memcpy(temp_name, lib_name, temp_size);
+			if (decode_name_B(temp_name, imp_len)) {
+				return 2;
+			}
+			::memcpy(temp_name, lib_name, temp_size);
+			if (decode_name_A(temp_name, mapped_xs->imp_key)) {
+				return 1;
+			}
+			return 0;
+		}
+
+	}; //namespace xs2
+}; //namespace xs_exe
+
+
 template <typename XS_IMPORT>
-bool fill_imports(const xs_exe::xs_variants type, BYTE* mapped_xs, XS_IMPORT*rs_import, IMAGE_IMPORT_DESCRIPTOR *imp_desc, size_t dlls_count, WORD imp_key)
+bool fill_imports(const int imp_type, BYTE* mapped_xs, size_t buf_size, XS_IMPORT*rs_import, IMAGE_IMPORT_DESCRIPTOR *imp_desc, size_t dlls_count, WORD imp_key)
 {
 	for (size_t i = 0; i < dlls_count; i++) {
 		if (rs_import[i].first_thunk == 0) break;
+
 		imp_desc[i].FirstThunk = rs_import[i].first_thunk;
 		imp_desc[i].OriginalFirstThunk = rs_import[i].original_first_thunk;
 		imp_desc[i].Name = rs_import[i].dll_name_rva;
 
+		if (imp_desc[i].Name > buf_size || imp_desc[i].FirstThunk > buf_size || imp_desc[i].OriginalFirstThunk > buf_size) {
+			break;
+		}
 		std::cout << "#" << i << ": "
 			<< "first_thunk: " << std::hex << rs_import[i].first_thunk << "\t"
 			<< "original_first_thunk: " << std::hex << rs_import[i].original_first_thunk << "\t"
 			<< "dll_name_rva: " << rs_import[i].dll_name_rva << "\t"
-			//<< "Unk: " << rs_import[i].obf_dll_len 
+			<< "Unk: " << rs_import[i].obf_dll_len 
 			<< "\n";
 #ifdef _DEBUG
 		std::cout << "Decoding name at: " << std::hex << rs_import[i].dll_name_rva << "\n";
 #endif
 		BYTE* lib_name = (BYTE*)((ULONG_PTR)mapped_xs + rs_import[i].dll_name_rva);
-		if (type == xs_exe::xs_variants::XS_VARIANT1_A || type == xs_exe::xs_variants::XS_VARIANT2) {
+		if (imp_type == 1) {
 			decode_name_A(lib_name, imp_key);
 		}
-		else if (type == xs_exe::xs_variants::XS_VARIANT1_B) {
+		else if (imp_type == 2) {
 			decode_name_B(lib_name, rs_import[i].obf_dll_len);
 		}
 	}
@@ -498,7 +561,7 @@ bool fill_headers(BYTE* rec_hdr, bool is32bit, ULONGLONG img_base, XS_FORMAT bee
 }
 
 template <typename XS_FORMAT, typename XS_IMPORT>
-bool fill_import_table(const xs_exe::xs_variants type, XS_FORMAT* bee_hdr, BYTE* out_buf, size_t out_size, bool is32bit)
+bool fill_import_table(const int imp_type, XS_FORMAT* bee_hdr, BYTE* out_buf, size_t out_size, bool is32bit)
 {
 	//WARNING: if the file alignment differs from virtual alignmnent it needs to be converted!
 	DWORD imports_raw = bee_hdr->data_dir[XS_IMPORTS].dir_va;
@@ -511,7 +574,7 @@ bool fill_import_table(const xs_exe::xs_variants type, XS_FORMAT* bee_hdr, BYTE*
 
 	BYTE* rec_imports = new BYTE[imp_area_size];
 	memset(rec_imports, 0, imp_area_size);
-	if (!fill_imports(type, out_buf, xs_import, (IMAGE_IMPORT_DESCRIPTOR*)rec_imports, dlls_count, bee_hdr->imp_key)) {
+	if (!fill_imports(imp_type, out_buf, out_size, xs_import, (IMAGE_IMPORT_DESCRIPTOR*)rec_imports, dlls_count, bee_hdr->imp_key)) {
 		std::cerr << "Failed to fill imports\n";
 	}
 
@@ -537,7 +600,7 @@ bool fill_import_table(const xs_exe::xs_variants type, XS_FORMAT* bee_hdr, BYTE*
 }
 
 template <typename XS_FORMAT>
-BLOB unscramble_xs1_pe(const xs_exe::xs_variants type, BYTE *in_buf, size_t buf_size, bool isMapped)
+BLOB unscramble_xs1_pe(const int imp_type, BYTE *in_buf, size_t buf_size, bool isMapped)
 {
 	BLOB mod = { 0 };
 	XS_FORMAT* bee_hdr = (XS_FORMAT*)in_buf;
@@ -572,8 +635,8 @@ BLOB unscramble_xs1_pe(const xs_exe::xs_variants type, BYTE *in_buf, size_t buf_
 
 	::memcpy(out_buf, rec_hdr, rec_size);
 	delete[]rec_hdr; rec_hdr = nullptr;
-
-	fill_import_table<XS_FORMAT, xs_exe::xs1::t_XS_import>(type, bee_hdr, out_buf, out_size, is32b);
+	
+	fill_import_table<XS_FORMAT, xs_exe::xs1::t_XS_import>(imp_type, bee_hdr, out_buf, out_size, is32b);
 	
 	fill_relocations_table(*bee_hdr, out_buf, img_base);
 	std::cout << "Finished...\n";
@@ -584,12 +647,12 @@ BLOB unscramble_xs1_pe(const xs_exe::xs_variants type, BYTE *in_buf, size_t buf_
 
 BLOB xs_exe::xs1::unscramble_pe_A(BYTE* buf, size_t buf_size, bool isMapped)
 {
-	return unscramble_xs1_pe<t_XS_format_A>(xs_exe::xs_variants::XS_VARIANT1_A, buf, buf_size, isMapped);
+	return unscramble_xs1_pe<t_XS_format_A>(1, buf, buf_size, isMapped);
 }
 
 BLOB xs_exe::xs1::unscramble_pe_B(BYTE* buf, size_t buf_size, bool isMapped)
 {
-	return unscramble_xs1_pe<t_XS_format_B>(xs_exe::xs_variants::XS_VARIANT1_B, buf, buf_size, isMapped);
+	return unscramble_xs1_pe<t_XS_format_B>(2, buf, buf_size, isMapped);
 }
 
 BLOB xs_exe::xs2::unscramble_pe(BYTE* in_buf, size_t buf_size, bool isMapped, bool is32bit)
@@ -624,9 +687,18 @@ BLOB xs_exe::xs2::unscramble_pe(BYTE* in_buf, size_t buf_size, bool isMapped, bo
 
 	::memcpy(out_buf, rec_hdr, rec_size);
 	delete[]rec_hdr; rec_hdr = nullptr;
+	const int imp_type = get_xs_import_type(bee_hdr, out_buf, out_size);
 
-	fill_import_table<t_XS_format, t_XS_import>(xs_exe::xs_variants::XS_VARIANT2, bee_hdr, out_buf, out_size, is32bit);
-
+	std::cout << "Detected imports type: " << imp_type;
+	if (imp_type == 1) {
+		std::cout << " (Rhadamanthys v. < 0.9.0)" << std::endl;
+		fill_import_table<t_XS_format, t_XS_import_A>(imp_type, bee_hdr, out_buf, out_size, is32bit);
+	}
+	else if (imp_type == 2) {
+		std::cout << " (Rhadamanthys v. >= 0.9.0)" << std::endl;
+		fill_import_table<t_XS_format, t_XS_import_B>(imp_type, bee_hdr, out_buf, out_size, is32bit);
+	}
+	std::cout << std::endl;
 	if (is32bit) {
 		fill_relocations_table(*bee_hdr, out_buf, (DWORD)img_base);
 	}

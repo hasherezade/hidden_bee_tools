@@ -110,7 +110,16 @@ namespace xs_exe {
 			DWORD first_thunk;
 			DWORD original_first_thunk;
 			WORD obf_dll_len;
-		} t_XS_import;
+		} t_XS_import_A;
+#pragma pack(pop) // Back to the previous settings
+
+#pragma pack(push, 1) // Adjust to one byte
+		typedef struct {
+			DWORD dll_name_rva;
+			DWORD first_thunk;
+			DWORD original_first_thunk;
+			DWORD obf_dll_len;
+		} t_XS_import_B;
 #pragma pack(pop) // Back to the previous settings
 
 		BLOB unscramble_pe(BYTE* buf, size_t buf_size, bool isMapped, bool is32bit);
