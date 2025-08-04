@@ -52,7 +52,7 @@ namespace xs_exe {
 			WORD sections_count;
 			WORD imp_key;
 			WORD hdr_size;
-			WORD unk;
+			WORD ver;
 			DWORD module_size;
 			DWORD entry_point;
 			t_XS_data_dir data_dir[XS_DATA_DIR_COUNT];
@@ -65,7 +65,7 @@ namespace xs_exe {
 			WORD nt_magic;
 			WORD sections_count;
 			WORD hdr_size;
-			BYTE unk;
+			BYTE ver;
 			BYTE imp_key;
 			DWORD module_size;
 			DWORD entry_point;
