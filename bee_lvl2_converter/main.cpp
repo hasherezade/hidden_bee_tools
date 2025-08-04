@@ -5,10 +5,13 @@
 
 #include "bee.h"
 
+#define VERSION "2.1"
+
 int main(int argc, char *argv[])
 {
 	if (argc < 3) {
 		std::cout << "Converter for Hidden Bee & Rhadamanthys custom executable formats\n";
+		std::cout << "Version: " << VERSION << ", Build date: " << __DATE__ << "\n---\n";
 		std::cout << "Args: <input_module> <is_mapped?> <module_base:hex>\n";
 		std::cout << "\t*input_module : custom module of Hidden Bee or Rhadamanthys, in one of the supported formats.\n";
 		std::cout << "\t*is_mapped? : 0 if the module in a raw format, 1 if in virtual.\n";
