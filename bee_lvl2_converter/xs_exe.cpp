@@ -405,7 +405,7 @@ namespace xs_exe {
 				<< "\nSec count:     " << xs_hdr->sections_count
 				<< "\nHdr Size:      " << xs_hdr->hdr_size
 				<< "\nNT magic:      " << xs_hdr->nt_magic
-				<< "\nImp Key:       " << xs_hdr->imp_key
+				<< "\nImp Key:       " << (unsigned int)xs_hdr->imp_key
 				<< "\nVersion:       " << (unsigned int)xs_hdr->ver
 				<< "\n" << std::endl;
 		}
@@ -420,7 +420,7 @@ namespace xs_exe {
 				<< "\nModuleSize:    " << xs_hdr->module_size
 				<< "\nSec count:     " << xs_hdr->sections_count
 				<< "\nHdr Size:      " << xs_hdr->hdr_size
-				<< "\nImp Key:       " << xs_hdr->imp_key
+				<< "\nImp Key:       " << (unsigned int)xs_hdr->imp_key
 				<< "\nEP Alt         " << xs_hdr->entry_point_alt
 				<< "\n" << std::endl;
 		}
